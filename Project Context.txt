@@ -1,0 +1,40 @@
+I would like to build a custom web application for automating CI/CD operations for SAP Cloud Integration artifacts ( Packages, iFlows, value mappings, etc... ) , the landing page should have 4 Tabs.. namely 1. CI/CD pipeline automation 2. Dashboard 3. Environments 4. Contact Us. 
+
+Following are some additional details about each tab : 
+1.	CI/CD Pipeline Automation:
+o	Automate the build, testing, and deployment of SAP Integration Suite artifacts (e.g., integration flows, value mappings, APIs, and scripts).
+o	The  pipeline should have the following 8 stages step by step
+1.	Display the list of recent 30 integration packages along with search and select functionality, where the user can select multiple packages part of the sandbox tenant
+2.	The second stage would display the list of iflows of the selected packages in the first screen, where the user can select single or multiple  iflows to be included in deployment package
+3.	The third  stage  would display the configuration of the each individually with edit mode.This will fetch the corresponding environment specific system information like URL,User credentials etc from the Environments feature.
+4.	Fourth  stage will be to validate against the design guidelines of each interface and display the info at each interface level  if it is not compliant meaning >30% is not compliant
+5.	Fifth stage is to validate the dependencies of the iflow interface and display
+6.	Sixth stages is to review and upload the artifacts to SAP integration suite tenant… and provide the status once uploaded 
+7.	Seventh stage is to deploy the artifacts from Designtime to runtime environment  and provide the status once deployed
+8.	8th stage Execute the test suite and provide overview of the test result of each interface.Finally the report can be summarized and can be downloaded or mailed.
+
+Additional notes :
+o	Support version control integration (e.g., Git) for artifact management.
+o	Enable rollback mechanisms for failed deployments.
+o	Ensure compatibility with SAP Integration Suite’s APIs and artifact formats.
+o	Provide audit trails and logs for all CI/CD activities.
+
+
+
+2.	Dashboard:
+o	Develop an intuitive web-based dashboard to monitor and manage CI/CD pipelines.
+o	Display real-time pipeline status (e.g., build, test, deploy stages).
+o	Provide visualizations for pipeline performance, success/failure rates, and deployment history.
+o	Allow users to trigger manual pipeline actions (e.g., start, stop, or rollback).
+o	Include role-based access control (RBAC) for secure access to dashboard features.
+
+3.	Environment Management:
+o	Create a secure module to store and manage connection details (e.g., URLs, credentials, API keys) for systems integrated with SAP Integration Suite (e.g., SAP S/4HANA, third-party APIs).
+o	Support multiple environments (e.g., development, testing, production).
+o	Implement secure storage for sensitive data (e.g., using a vault solution like HashiCorp Vault or AWS Secrets Manager).
+o	Enable easy configuration updates without redeploying artifacts.
+o	Provide an interface to validate connection details and test system connectivity.
+
+4. Contact Us :
+
+o	Provide a template page to write/email us, call our support number, or send a message directly from the webpage by providing name, email, error message details.
