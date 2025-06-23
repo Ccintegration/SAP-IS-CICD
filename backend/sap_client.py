@@ -157,7 +157,7 @@ class SAPClient:
                 package = IntegrationPackage(
                     id=item.get('Id', ''),
                     name=item.get('Name', ''),
-                    description=item.get('Description') or '',
+                    description=item.get('ShortText') or '',
                     version=item.get('Version') or '1.0.0',
                     modifiedDate=item.get('ModifiedDate'),
                     modifiedBy=item.get('ModifiedBy'),
