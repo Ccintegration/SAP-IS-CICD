@@ -1,13 +1,14 @@
-// Stage1PackageList.tsx - Fix 1: Prevent Double API Call
-// Key changes to prevent the API from being called twice on page load
+// File Path: src/components/pipeline/Stage1PackageList.tsx
+// Filename: Stage1PackageList.tsx
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ArrowRight, Package as PackageIcon } from "lucide-react";
 
-// Import new components and services
+// Import components and services
 import { Package, Stage1Props } from './types/PackageTypes';
 import { SortField, SortDirection } from './components/PackageTable';
 import { PackagePaginationService, PackagePaginationRequest, PackagePaginationResponse } from '@/lib/package-pagination-service';
@@ -26,7 +27,7 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [packagesPerPage, setPackagesPerPage] = useState(10); // ✅ FIX 4: Default packages per page set to 10
+  const [packagesPerPage, setPackagesPerPage] = useState(10);
   const [sortField, setSortField] = useState<SortField>('modifiedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
@@ -35,20 +36,17 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ FIX 1: More robust approach - track calls with timestamp
+  // Refs to prevent duplicate API calls
   const lastCallRef = useRef<number>(0);
   const isLoadingRef = useRef(false);
 
-  // Load packages with pagination - removed from useCallback to break dependency cycle
+  // Load packages with pagination
   const loadPackages = async () => {
     const now = Date.now();
     
-    // ✅ FIX 1: Prevent calls within 500ms of each other
+    // Prevent calls within 500ms of each other
     if (isLoadingRef.current || (now - lastCallRef.current) < 500) {
-      console.log("⚠️ Skipping API call - too recent or already loading", {
-        isLoading: isLoadingRef.current,
-        timeSinceLastCall: now - lastCallRef.current
-      });
+      console.log("⚠️ Skipping API call - too recent or already loading");
       return;
     }
 
@@ -58,7 +56,7 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
     setError(null);
     
     try {
-      console.log("📡 Making API call to /api/sap/packages", {
+      console.log("📡 Making API call for packages", {
         timestamp: new Date().toISOString(),
         page: currentPage,
         pageSize: packagesPerPage,
@@ -92,8 +90,6 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
     }
   };
 
-  // ✅ FIX 1: Separate useEffects with careful dependency management
-  
   // Initial load only
   useEffect(() => {
     console.log("🚀 Initial load useEffect");
@@ -118,13 +114,13 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
     loadPackages();
   }, [currentPage, packagesPerPage, searchTerm, sortField, sortDirection]);
 
-  // ✅ FIX 1: Remove the separate useEffect that was causing double calls
-  // This was the problematic useEffect:
-  // useEffect(() => {
-  //   if (currentPage !== 1) {
-  //     setCurrentPage(1);
-  //   }
-  // }, [searchTerm, sortField, sortDirection, packagesPerPage]);
+  // IMPROVED: Reset to page 1 when search term, sort, or page size changes
+  useEffect(() => {
+    if (lastCallRef.current > 0 && currentPage !== 1) {
+      console.log("🔄 Resetting to page 1 due to search/sort/pageSize change");
+      setCurrentPage(1);
+    }
+  }, [searchTerm, sortField, sortDirection, packagesPerPage]);
 
   // Event handlers
   const handlePackageToggle = useCallback((packageId: string) => {
@@ -159,7 +155,6 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   const handlePackagesPerPageChange = useCallback((value: string) => {
     const newPerPage = parseInt(value, 10);
     setPackagesPerPage(newPerPage);
-    // currentPage will be reset to 1 in the main useEffect
   }, []);
 
   const handleSortFieldChange = useCallback((field: SortField) => {
@@ -181,9 +176,14 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
 
   const handleRefresh = useCallback(() => {
     PackagePaginationService.clearCache();
-    // Reset the timestamp to allow immediate refresh
     lastCallRef.current = 0;
     loadPackages();
+  }, []);
+
+  // IMPROVED: Enhanced search handler with immediate feedback
+  const handleSearchChange = useCallback((value: string) => {
+    console.log(`🔍 Search term changed: "${value}"`);
+    setSearchTerm(value);
   }, []);
 
   const handleNext = useCallback(() => {
@@ -204,53 +204,15 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
     paginationData.packages.length > 0 && 
     paginationData.packages.every(pkg => selectedPackages.includes(pkg.id)) : false;
 
-  // Loading state
-  if (loading && !paginationData) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">
-            Loading packages from SAP Integration Suite...
-          </p>
-          <p className="text-xs text-gray-500 mt-2">
-            Optimized for fast loading with pagination
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <div className="text-red-600 mb-4">
-            <PackageIcon className="w-12 h-12 mx-auto mb-2" />
-            <p className="font-medium">Failed to load packages</p>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-          <Button onClick={handleRefresh} variant="outline">
-            Try Again
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <PackageIcon className="w-5 h-5 text-blue-600" />
-          <span>Select Integration Packages</span>
-          <Badge variant="outline" className="ml-auto">
-            Step 1 of 8
-          </Badge>
+          <PackageIcon className="w-5 h-5" />
+          <span>Stage 1: Package Selection</span>
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Choose the integration packages you want to include in your CI/CD pipeline. 
+          Select integration packages from your SAP Integration Suite tenant.
           Package data loads incrementally for optimal performance.
         </p>
       </CardHeader>
@@ -259,7 +221,7 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
         {/* Search and Sort Controls */}
         <PackageSearchAndSort
           searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={handleSearchChange}
           sortField={sortField}
           sortDirection={sortDirection}
           onSortFieldChange={handleSortFieldChange}
@@ -276,14 +238,33 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
             <div className="flex items-center space-x-2">
               <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
               <span className="text-sm text-blue-800">
-                Updating package list...
+                {searchTerm ? `Searching for "${searchTerm}"...` : "Updating package list..."}
               </span>
             </div>
           </div>
         )}
 
+        {/* No Results Message */}
+        {!loading && paginationData && paginationData.packages.length === 0 && searchTerm && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 text-center">
+            <h3 className="text-yellow-800 font-medium">No packages found</h3>
+            <p className="text-yellow-600 text-sm mt-1">
+              No packages match your search term "<strong>{searchTerm}</strong>". 
+              Try adjusting your search criteria or clear the search to see all packages.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setSearchTerm("")}
+              className="mt-2"
+            >
+              Clear Search
+            </Button>
+          </div>
+        )}
+
         {/* Package Table */}
-        {paginationData && (
+        {paginationData && paginationData.packages.length > 0 && (
           <PackageTable
             packages={paginationData.packages}
             selectedPackages={selectedPackages}
@@ -297,17 +278,38 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
         )}
 
         {/* Pagination Info and Controls */}
-        {paginationData && (
+        {paginationData && paginationData.packages.length > 0 && (
           <>
-            {/* ✅ FIX 5: Updated pagination info format with proper "showing packages x to y from z" */}
             <div className="flex items-center justify-between text-sm text-gray-600">
               <div>
                 showing packages {((paginationData.currentPage - 1) * paginationData.pageSize) + 1} to{' '}
                 {Math.min(paginationData.currentPage * paginationData.pageSize, paginationData.totalCount)} from{' '}
                 {paginationData.totalCount} packages
+                {searchTerm && (
+                  <span className="text-blue-600 ml-2">
+                    (filtered by "{searchTerm}")
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-4">
-                <span>Show 10/20/50 per page</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Show</span>
+                  <Select
+                    value={packagesPerPage.toString()}
+                    onValueChange={handlePackagesPerPageChange}
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm">per page</span>
+                </div>
                 {selectedPackages.length > 0 && (
                   <div className="text-blue-600">
                     {selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected

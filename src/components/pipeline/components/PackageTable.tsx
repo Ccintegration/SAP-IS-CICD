@@ -1,4 +1,6 @@
-// PackageTable.tsx - Fix 2: Remove Active Badge and Change to Created By
+// File Path: src/components/pipeline/components/PackageTable.tsx
+// Filename: PackageTable.tsx
+
 import React from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -34,36 +36,79 @@ const PackageTable: React.FC<PackageTableProps> = ({
 }) => {
   const formatDate = (dateString: string) => {
     try {
-      // Handle Unix timestamp (from SAP API)
-      const timestamp = parseInt(dateString, 10);
-      if (!isNaN(timestamp)) {
-        return new Date(timestamp).toLocaleDateString('en-US', {
+      // Check if modifiedDate field exists and is valid
+      if (!dateString || dateString === '' || dateString === 'null' || dateString === 'undefined') {
+        return 'Not available';
+      }
+
+      const dateStr = String(dateString).trim();
+      console.log(`🗓️ [Package] Formatting modifiedDate: "${dateStr}"`); // Debug log
+      
+      // Handle your specific backend format: "1707260736305" (13-digit Unix timestamp)
+      if (dateStr.match(/^\d{13}$/)) {
+        const timestamp = parseInt(dateStr, 10);
+        const date = new Date(timestamp);
+        
+        console.log(`📅 [Package] Unix timestamp ${dateStr} → ${date.toISOString()}`);
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          console.warn('❌ [Package] Invalid timestamp:', dateStr);
+          return 'Not available';
+        }
+
+        // Format for display
+        return date.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric'
         });
       }
-      // Handle ISO date string
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    } catch {
-      return 'Unknown';
-    }
-  };
+      
+      // Handle 10-digit Unix timestamp (seconds)
+      else if (dateStr.match(/^\d{10}$/)) {
+        const timestamp = parseInt(dateStr, 10) * 1000;
+        const date = new Date(timestamp);
+        
+        console.log(`📅 [Package] Unix seconds ${dateStr} → ${date.toISOString()}`);
+        
+        if (isNaN(date.getTime())) {
+          console.warn('❌ [Package] Invalid timestamp:', dateStr);
+          return 'Not available';
+        }
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 border-green-300";
-      case "draft":
-        return "bg-yellow-100 text-yellow-800 border-yellow-300";
-      case "deprecated":
-        return "bg-red-100 text-red-800 border-red-300";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-300";
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+      
+      // Handle ISO format as fallback
+      else if (dateStr.includes('T') || dateStr.includes('Z')) {
+        const date = new Date(dateStr);
+        
+        if (isNaN(date.getTime())) {
+          console.warn('❌ [Package] Invalid ISO date:', dateStr);
+          return 'Not available';
+        }
+
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+      
+      // If format doesn't match expected patterns, return "Not available"
+      else {
+        console.warn('❌ [Package] Unexpected date format:', dateStr);
+        return 'Not available';
+      }
+
+    } catch (error) {
+      console.error('❌ [Package] Error formatting date:', dateString, error);
+      return 'Not available';
     }
   };
 
@@ -86,9 +131,9 @@ const PackageTable: React.FC<PackageTableProps> = ({
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      {/* Table Header - ✅ FIX 6: All headers aligned left */}
+      {/* Table Header - MOVED PACKAGE NAME LEFT */}
       <div className="bg-gray-50 border-b">
-        <div className="grid grid-cols-12 gap-4 p-3 items-center">
+        <div className="grid grid-cols-12 gap-0 p-3 items-center">
           {/* Select All Checkbox */}
           <div className="col-span-1 text-left">
             <Checkbox
@@ -98,29 +143,29 @@ const PackageTable: React.FC<PackageTableProps> = ({
             />
           </div>
           
-          {/* ✅ FIX 6: Left-aligned Package Name Header */}
-          <div className="col-span-4 text-left">
+          {/* Package Name Header - MOVED LEFT towards checkbox */}
+          <div className="col-span-4 text-left -ml-9">
             <SortButton field="name">Package Name</SortButton>
           </div>
           
-          {/* ✅ FIX 6: Left-aligned Description Header */}
-          <div className="col-span-4 text-left">
+          {/* Description Header */}
+          <div className="col-span-4 text-left ml-1">
             <span className="text-sm font-medium text-gray-700">Description</span>
           </div>
           
-          {/* ✅ FIX 6: Left-aligned Version Header */}
-          <div className="col-span-1 text-left">
+          {/* Version Header */}
+          <div className="col-span-1 text-left ml-1">
             <span className="text-sm font-medium text-gray-700">Version</span>
           </div>
           
-          {/* ✅ FIX 6: Left-aligned Date Header */}
-          <div className="col-span-2 text-left">
+          {/* Date Header */}
+          <div className="col-span-2 text-left ml-1">
             <SortButton field="modifiedDate">Modified Date</SortButton>
           </div>
         </div>
       </div>
 
-      {/* Table Body */}
+      {/* Table Body - MOVED PACKAGE NAME LEFT */}
       <div className="divide-y divide-gray-200">
         {packages.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
@@ -129,7 +174,7 @@ const PackageTable: React.FC<PackageTableProps> = ({
           </div>
         ) : (
           packages.map((pkg) => (
-            <div key={pkg.id} className="grid grid-cols-12 gap-4 p-3 items-center hover:bg-gray-50 transition-colors">
+            <div key={pkg.id} className="grid grid-cols-12 gap-0 p-3 items-center hover:bg-gray-50 transition-colors">
               {/* Select Checkbox */}
               <div className="col-span-1 text-left">
                 <Checkbox
@@ -139,19 +184,18 @@ const PackageTable: React.FC<PackageTableProps> = ({
                 />
               </div>
               
-              {/* ✅ FIX 6: Left-aligned Package Name Content */}
-              <div className="col-span-4 text-left">
+              {/* Package Name Content - MOVED LEFT towards checkbox */}
+              <div className="col-span-4 text-left -ml-9">
                 <div className="font-medium text-gray-900 truncate" title={pkg.name}>
                   {pkg.name}
                 </div>
-                {/* ✅ FIX 2: Removed the active badge and changed "Modified by" to "Created By" */}
                 <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
                   <span>Created By: {pkg.createdBy || pkg.modifiedBy || 'Unknown'}</span>
                 </div>
               </div>
               
-              {/* ✅ FIX 6: Left-aligned Description Content */}
-              <div className="col-span-4 text-left">
+              {/* Description Content */}
+              <div className="col-span-4 text-left ml-1">
                 <div 
                   className="text-sm text-gray-600 line-clamp-2" 
                   title={pkg.description}
@@ -160,13 +204,13 @@ const PackageTable: React.FC<PackageTableProps> = ({
                 </div>
               </div>
               
-              {/* ✅ FIX 6: Left-aligned Version Content */}
-              <div className="col-span-1 text-left">
+              {/* Version Content */}
+              <div className="col-span-1 text-left ml-1">
                 <span className="text-sm text-gray-900">{pkg.version}</span>
               </div>
               
-              {/* ✅ FIX 6: Left-aligned Date Content */}
-              <div className="col-span-2 text-left">
+              {/* Date Content */}
+              <div className="col-span-2 text-left ml-1">
                 <div className="text-sm text-gray-900">
                   {formatDate(pkg.modifiedDate)}
                 </div>
