@@ -1,6 +1,6 @@
 // File Path: src/components/pipeline/Stage2IFlowList.tsx
 // Filename: Stage2IFlowList.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,21 +94,49 @@ const Stage2IFlowList: React.FC<Stage2Props> = ({
     itemsPerPage: number;
   }>>({});
 
-  useEffect(() => {
-    loadIFlows();
-  }, [data.selectedPackages]);
+  
+  const lastCallRef = useRef<number>(0);
+  const isLoadingRef = useRef(false);
+  const selectedPackagesRef = useRef<string[]>([]);
 
+  
   const loadIFlows = async () => {
+    const now = Date.now();
+    const currentSelectedPackages = data.selectedPackages || [];
+    
+    
+    if (isLoadingRef.current || (now - lastCallRef.current) < 500) {
+      console.log("⚠️ Skipping iFlows API call - too recent or already loading", {
+        isLoading: isLoadingRef.current,
+        timeSinceLastCall: now - lastCallRef.current
+      });
+      return;
+    }
+
+    
+    const packagesChanged = JSON.stringify(selectedPackagesRef.current) !== JSON.stringify(currentSelectedPackages);
+    if (!packagesChanged && lastCallRef.current > 0) {
+      console.log("⚠️ Skipping iFlows API call - selectedPackages haven't changed");
+      return;
+    }
+
+    lastCallRef.current = now;
+    isLoadingRef.current = true;
+    selectedPackagesRef.current = [...currentSelectedPackages];
+    
     setLoading(true);
     setError(null);
+    
     try {
-      console.log("🔍 [DEBUG] Complete pipeline data:", data);
-      console.log("🔍 [DEBUG] data.selectedPackages:", data.selectedPackages);
+      console.log("📡 Making iFlows API call to /api/sap/iflows", {
+        timestamp: new Date().toISOString(),
+        selectedPackages: currentSelectedPackages,
+        packageIds: currentSelectedPackages.length > 0 ? currentSelectedPackages : ["all"]
+      });
 
-      const selectedPackageIds =
-        data.selectedPackages && data.selectedPackages.length > 0
-          ? data.selectedPackages
-          : ["all"]; // Fallback to all packages if none selected
+      const selectedPackageIds = currentSelectedPackages.length > 0 
+        ? currentSelectedPackages 
+        : ["all"]; // Fallback to all packages if none selected
 
       console.log("🔍 [DEBUG] Fetching iFlows for packages:", selectedPackageIds);
 
@@ -181,11 +209,9 @@ const Stage2IFlowList: React.FC<Stage2Props> = ({
 
       if (error instanceof Error) {
         if (error.message.includes("No base tenant registered")) {
-          errorMessage =
-            "No SAP tenant registered. Please register your tenant in the Administration tab first.";
+          errorMessage = "No SAP tenant registered. Please register your tenant in the Administration tab first.";
         } else if (error.message.includes("Backend URL not configured")) {
-          errorMessage =
-            "Backend URL not configured. Please configure your Python FastAPI backend URL in the Administration tab.";
+          errorMessage = "Backend URL not configured. Please configure your Python FastAPI backend URL in the Administration tab.";
         } else if (error.message.includes("Cannot connect to backend")) {
           errorMessage = `Backend connection failed: ${error.message}. Please ensure your Python FastAPI backend is running and accessible.`;
         } else {
@@ -196,8 +222,20 @@ const Stage2IFlowList: React.FC<Stage2Props> = ({
       setError(errorMessage);
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
+
+  // ✅ FIX 1: Single useEffect with proper dependency management
+  useEffect(() => {
+    console.log("🔄 Stage2 useEffect triggered", {
+      selectedPackages: data.selectedPackages,
+      hasChanged: JSON.stringify(selectedPackagesRef.current) !== JSON.stringify(data.selectedPackages || [])
+    });
+    
+    loadIFlows();
+  }, [data.selectedPackages]); // Only depend on selectedPackages
+
   const useIFlowCounting = (selectedPackages: string[]) => {
     const [packageIFlowCounts, setPackageIFlowCounts] = useState<Record<string, number>>({});
     const [loadingCounts, setLoadingCounts] = useState(false);
@@ -318,6 +356,20 @@ const Stage2IFlowList: React.FC<Stage2Props> = ({
     }));
   };
 
+  const getPaginationDisplayText = (currentPage: number, itemsPerPage: number, totalItems: number, isFiltered: boolean, originalTotal?: number) => {
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    
+    let displayText = `showing ${startItem} to ${endItem} of ${totalItems} iFlows`;
+    
+    if (isFiltered && originalTotal) {
+      displayText += ` (filtered from ${originalTotal} total)`;
+    }
+    
+    displayText += ` (sorted by latest updated)`;
+    
+    return displayText;
+  };
   const getPaginatedIFlows = (packageId: string, iflows: IFlow[]) => {
     const pagination = packagePagination[packageId] || { currentPage: 1, itemsPerPage: 10 };
     const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
@@ -549,11 +601,13 @@ const Stage2IFlowList: React.FC<Stage2Props> = ({
 
                         {/* Results summary for this package */}
                         <div className="text-sm text-gray-600 mb-4">
-                          Showing {Math.min(filteredIFlows.length, itemsPerPage)} of {filteredIFlows.length} iFlows
-                          {searchTerm && (
-                            <span className="ml-1">(filtered from {packageData.iflows.length} total)</span>
+                          {getPaginationDisplayText(
+                            currentPage, 
+                            itemsPerPage, 
+                            filteredIFlows.length,
+                            searchTerm && filteredIFlows.length !== packageData.iflows.length,
+                            packageData.iflows.length
                           )}
-                          <span className="text-blue-600 ml-2">(sorted by latest updated)</span>
                         </div>
 
                         {/* iFlows List */}

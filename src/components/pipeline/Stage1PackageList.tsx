@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+// Stage1PackageList.tsx - Fix 1: Prevent Double API Call
+// Key changes to prevent the API from being called twice on page load
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +26,7 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [packagesPerPage, setPackagesPerPage] = useState(20); // Increased default
+  const [packagesPerPage, setPackagesPerPage] = useState(10); // ✅ FIX 4: Default packages per page set to 10
   const [sortField, setSortField] = useState<SortField>('modifiedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
@@ -32,12 +35,38 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load packages with pagination
-  const loadPackages = useCallback(async () => {
+  // ✅ FIX 1: More robust approach - track calls with timestamp
+  const lastCallRef = useRef<number>(0);
+  const isLoadingRef = useRef(false);
+
+  // Load packages with pagination - removed from useCallback to break dependency cycle
+  const loadPackages = async () => {
+    const now = Date.now();
+    
+    // ✅ FIX 1: Prevent calls within 500ms of each other
+    if (isLoadingRef.current || (now - lastCallRef.current) < 500) {
+      console.log("⚠️ Skipping API call - too recent or already loading", {
+        isLoading: isLoadingRef.current,
+        timeSinceLastCall: now - lastCallRef.current
+      });
+      return;
+    }
+
+    lastCallRef.current = now;
+    isLoadingRef.current = true;
     setLoading(true);
     setError(null);
     
     try {
+      console.log("📡 Making API call to /api/sap/packages", {
+        timestamp: new Date().toISOString(),
+        page: currentPage,
+        pageSize: packagesPerPage,
+        searchTerm: searchTerm || undefined,
+        sortField,
+        sortDirection,
+      });
+
       const request: PackagePaginationRequest = {
         page: currentPage,
         pageSize: packagesPerPage,
@@ -59,20 +88,43 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
       setError(error instanceof Error ? error.message : "Failed to load packages");
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
+  };
+
+  // ✅ FIX 1: Separate useEffects with careful dependency management
+  
+  // Initial load only
+  useEffect(() => {
+    console.log("🚀 Initial load useEffect");
+    loadPackages();
+  }, []); // Empty dependency array for initial load only
+
+  // Handle search/sort/pagination changes
+  useEffect(() => {
+    // Skip if this is the initial render
+    if (lastCallRef.current === 0) {
+      return;
+    }
+
+    console.log("🔄 Search/Sort/Pagination change useEffect", {
+      currentPage, 
+      packagesPerPage, 
+      searchTerm, 
+      sortField, 
+      sortDirection 
+    });
+
+    loadPackages();
   }, [currentPage, packagesPerPage, searchTerm, sortField, sortDirection]);
 
-  // Load packages when dependencies change
-  useEffect(() => {
-    loadPackages();
-  }, [loadPackages]);
-
-  // Reset to first page when search/sort changes
-  useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm, sortField, sortDirection, packagesPerPage]);
+  // ✅ FIX 1: Remove the separate useEffect that was causing double calls
+  // This was the problematic useEffect:
+  // useEffect(() => {
+  //   if (currentPage !== 1) {
+  //     setCurrentPage(1);
+  //   }
+  // }, [searchTerm, sortField, sortDirection, packagesPerPage]);
 
   // Event handlers
   const handlePackageToggle = useCallback((packageId: string) => {
@@ -107,7 +159,7 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   const handlePackagesPerPageChange = useCallback((value: string) => {
     const newPerPage = parseInt(value, 10);
     setPackagesPerPage(newPerPage);
-    setCurrentPage(1);
+    // currentPage will be reset to 1 in the main useEffect
   }, []);
 
   const handleSortFieldChange = useCallback((field: SortField) => {
@@ -129,8 +181,10 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
 
   const handleRefresh = useCallback(() => {
     PackagePaginationService.clearCache();
+    // Reset the timestamp to allow immediate refresh
+    lastCallRef.current = 0;
     loadPackages();
-  }, [loadPackages]);
+  }, []);
 
   const handleNext = useCallback(() => {
     if (selectedPackages.length === 0) {
@@ -245,17 +299,21 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
         {/* Pagination Info and Controls */}
         {paginationData && (
           <>
+            {/* ✅ FIX 5: Updated pagination info format with proper "showing packages x to y from z" */}
             <div className="flex items-center justify-between text-sm text-gray-600">
               <div>
-                Showing {((paginationData.currentPage - 1) * paginationData.pageSize) + 1} to{' '}
-                {Math.min(paginationData.currentPage * paginationData.pageSize, paginationData.totalCount)} of{' '}
+                showing packages {((paginationData.currentPage - 1) * paginationData.pageSize) + 1} to{' '}
+                {Math.min(paginationData.currentPage * paginationData.pageSize, paginationData.totalCount)} from{' '}
                 {paginationData.totalCount} packages
               </div>
-              {selectedPackages.length > 0 && (
-                <div className="text-blue-600">
-                  {selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected
-                </div>
-              )}
+              <div className="flex items-center gap-4">
+                <span>Show 10/20/50 per page</span>
+                {selectedPackages.length > 0 && (
+                  <div className="text-blue-600">
+                    {selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected
+                  </div>
+                )}
+              </div>
             </div>
 
             <PackagePagination

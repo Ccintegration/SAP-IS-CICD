@@ -1,3 +1,4 @@
+// PackageTable.tsx - Fix 2: Remove Active Badge and Change to Created By
 import React from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -85,11 +86,11 @@ const PackageTable: React.FC<PackageTableProps> = ({
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      {/* Table Header */}
+      {/* Table Header - ✅ FIX 6: All headers aligned left */}
       <div className="bg-gray-50 border-b">
         <div className="grid grid-cols-12 gap-4 p-3 items-center">
           {/* Select All Checkbox */}
-          <div className="col-span-1">
+          <div className="col-span-1 text-left">
             <Checkbox
               checked={isSelectAllChecked}
               onCheckedChange={onSelectAll}
@@ -97,23 +98,23 @@ const PackageTable: React.FC<PackageTableProps> = ({
             />
           </div>
           
-          {/* Name Column (30%) */}
-          <div className="col-span-4">
+          {/* ✅ FIX 6: Left-aligned Package Name Header */}
+          <div className="col-span-4 text-left">
             <SortButton field="name">Package Name</SortButton>
           </div>
           
-          {/* Description Column (40%) */}
-          <div className="col-span-4">
+          {/* ✅ FIX 6: Left-aligned Description Header */}
+          <div className="col-span-4 text-left">
             <span className="text-sm font-medium text-gray-700">Description</span>
           </div>
           
-          {/* Version Column (15%) */}
-          <div className="col-span-1">
+          {/* ✅ FIX 6: Left-aligned Version Header */}
+          <div className="col-span-1 text-left">
             <span className="text-sm font-medium text-gray-700">Version</span>
           </div>
           
-          {/* Date Column (15%) */}
-          <div className="col-span-2">
+          {/* ✅ FIX 6: Left-aligned Date Header */}
+          <div className="col-span-2 text-left">
             <SortButton field="modifiedDate">Modified Date</SortButton>
           </div>
         </div>
@@ -130,7 +131,7 @@ const PackageTable: React.FC<PackageTableProps> = ({
           packages.map((pkg) => (
             <div key={pkg.id} className="grid grid-cols-12 gap-4 p-3 items-center hover:bg-gray-50 transition-colors">
               {/* Select Checkbox */}
-              <div className="col-span-1">
+              <div className="col-span-1 text-left">
                 <Checkbox
                   checked={selectedPackages.includes(pkg.id)}
                   onCheckedChange={() => onPackageToggle(pkg.id)}
@@ -138,21 +139,19 @@ const PackageTable: React.FC<PackageTableProps> = ({
                 />
               </div>
               
-              {/* Name Column (30%) */}
-              <div className="col-span-4">
+              {/* ✅ FIX 6: Left-aligned Package Name Content */}
+              <div className="col-span-4 text-left">
                 <div className="font-medium text-gray-900 truncate" title={pkg.name}>
                   {pkg.name}
                 </div>
+                {/* ✅ FIX 2: Removed the active badge and changed "Modified by" to "Created By" */}
                 <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className={getStatusBadgeColor(pkg.status)}>
-                    {pkg.status}
-                  </Badge>
-                  <span>Modified by: {pkg.modifiedBy || 'Unknown'}</span>
+                  <span>Created By: {pkg.createdBy || pkg.modifiedBy || 'Unknown'}</span>
                 </div>
               </div>
               
-              {/* Description Column (40%) */}
-              <div className="col-span-4">
+              {/* ✅ FIX 6: Left-aligned Description Content */}
+              <div className="col-span-4 text-left">
                 <div 
                   className="text-sm text-gray-600 line-clamp-2" 
                   title={pkg.description}
@@ -161,13 +160,13 @@ const PackageTable: React.FC<PackageTableProps> = ({
                 </div>
               </div>
               
-              {/* Version Column (15%) */}
-              <div className="col-span-1">
+              {/* ✅ FIX 6: Left-aligned Version Content */}
+              <div className="col-span-1 text-left">
                 <span className="text-sm text-gray-900">{pkg.version}</span>
               </div>
               
-              {/* Date Column (15%) */}
-              <div className="col-span-2">
+              {/* ✅ FIX 6: Left-aligned Date Content */}
+              <div className="col-span-2 text-left">
                 <div className="text-sm text-gray-900">
                   {formatDate(pkg.modifiedDate)}
                 </div>
