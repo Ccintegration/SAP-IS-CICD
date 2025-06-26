@@ -1,204 +1,189 @@
 # ============================================================================
 # SAP Integration Suite Backend - Python Dependencies
 # ============================================================================
- 
+
 # Core FastAPI Framework and ASGI Server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
- 
+fastapi
+uvicorn[standard]
+
 # HTTP Client Libraries
-httpx==0.25.2
-requests==2.31.0
- 
+httpx
+requests
+
 # Data Validation and Serialization
-pydantic==2.5.0
+pydantic
 pydantic-settings
- 
+
 # Environment and Configuration Management
-python-dotenv==1.0.0
- 
+python-dotenv
+
 # Date and Time Utilities
-python-dateutil==2.8.2
- 
+python-dateutil
+
 # Async Support
-asyncio-mqtt==0.11.1
-aiofiles==23.2.1
- 
-# JSON Handling (built-in, but explicit for clarity)
-# json - included in Python standard library
- 
+asyncio-mqtt
+aiofiles
+
 # Logging and Monitoring
-structlog==23.2.0
-python-json-logger==2.0.7
- 
+structlog
+python-json-logger
+
 # Type Hints Support
-typing-extensions==4.8.0
- 
+typing-extensions
+
 # URL Parsing and Encoding
-urllib3==2.1.0
- 
+urllib3
+
 # Development and Testing Dependencies
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-mock==3.12.0
-#httpx-mock
- 
+pytest
+pytest-asyncio
+pytest-mock
+
 # Code Quality and Formatting
-black==23.11.0
-flake8==6.1.0
-isort==5.12.0
-mypy==1.7.1
- 
+black
+flake8
+isort
+mypy
+
 # Security and Authentication
-passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
-bcrypt==4.1.2
- 
+passlib[bcrypt]
+python-jose[cryptography]
+bcrypt
+
 # Database Support (for future persistence)
-sqlalchemy==2.0.23
-alembic==1.12.1
-#sqlite3==0.0.0  # Built into Python, but listed for clarity
- 
+sqlalchemy
+alembic
+
 # Caching (optional for performance)
-redis==5.0.1
-python-memcached==1.62
- 
+redis
+python-memcached
+
 # Metrics and Monitoring (optional)
-prometheus-client==0.19.0
-opentelemetry-api==1.21.0
-opentelemetry-sdk==1.21.0
- 
+prometheus-client
+opentelemetry-api
+opentelemetry-sdk
+
 # Additional Utilities
-click==8.1.7  # For CLI commands
-rich==13.7.0  # For better console output
-typer==0.9.0  # For CLI application support
- 
+click
+rich
+typer
+
 # Testing and Mock Data
-faker==20.1.0
-factory-boy==3.3.0
- 
+faker
+factory-boy
+
 # Error Handling and Debugging
-sentry-sdk[fastapi]==1.38.0  # For error tracking in production
- 
+sentry-sdk[fastapi]
+
 # Configuration Validation
-cerberus==1.3.5
-marshmallow==3.20.1
- 
+cerberus
+marshmallow
+
 # Async Database Drivers (if needed)
-aiosqlite==0.19.0
-asyncpg==0.29.0  # For PostgreSQL
- 
+aiosqlite
+asyncpg
+
 # HTTP and API Utilities
-python-multipart==0.0.6  # For form data handling
-email-validator==2.1.0  # For email validation in Pydantic
- 
+python-multipart
+email-validator
+
 # Development Server and Hot Reload
-watchfiles==0.21.0  # Used by uvicorn for auto-reload
- 
+watchfiles
+
 # XML Processing (for SAP API responses that might return XML)
-lxml==4.9.3
-xmltodict==0.13.0
- 
+lxml
+xmltodict
+
 # CSV and Data Processing
-pandas==2.1.4  # For data manipulation if needed
-openpyxl==3.1.2  # For Excel file handling
- 
+pandas
+openpyxl
+xlsxwriter
+
 # Timezone Support
-pytz==2023.3
-zoneinfo-backport==0.2.1  # For Python < 3.9
- 
+pytz
+
+
 # ============================================================================
 # Production-Only Dependencies
 # ============================================================================
- 
+
 # Production ASGI Server (alternative to uvicorn)
-gunicorn==21.2.0
- 
+gunicorn
+
 # Production Database Drivers
-psycopg2-binary==2.9.9  # PostgreSQL
-PyMySQL==1.1.0  # MySQL
- 
+psycopg2-binary
+PyMySQL
+
 # Load Balancing and Health Checks
-healthcheck==1.3.3
- 
+healthcheck
+
 # ============================================================================
 # Optional Dependencies for Enhanced Features
 # ============================================================================
- 
+
 # Background Tasks
-celery[redis]==5.3.4
-flower==2.0.1  # Celery monitoring
- 
+celery[redis]
+flower
+
 # API Documentation Enhancement
-swagger-ui-bundle==0.0.9
- 
+swagger-ui-bundle
+
 # JWT Token Handling
-PyJWT==2.8.0
- 
-# Excel/CSV Export Features
-openpyxl==3.1.2
-xlsxwriter==3.1.9
- 
+PyJWT
+
 # Email Notifications
-fastapi-mail==1.4.1
-aiosmtplib==3.0.1
- 
+fastapi-mail
+aiosmtplib
+
 # File Upload Handling
-python-magic==0.4.27
- 
+python-magic
+
 # ============================================================================
 # Development and Testing Only
 # ============================================================================
- 
+
 # Code Coverage
-coverage==7.3.2
-pytest-cov==4.1.0
- 
+coverage
+pytest-cov
+
 # API Testing
-tavern==2.3.0
-respx==0.20.2
- 
+tavern
+respx
+
 # Performance Testing
-locust==2.17.0
- 
+locust
+
 # Documentation Generation
-mkdocs==1.5.3
-mkdocs-material==9.4.8
- 
+mkdocs
+mkdocs-material
+
 # Pre-commit Hooks
-pre-commit==3.5.0
- 
+pre-commit
+
 # ============================================================================
 # Platform-Specific Dependencies
 # ============================================================================
- 
+
 # Windows-specific
-pywin32==306; sys_platform == "win32"
- 
+pywin32; sys_platform == "win32"
+
 # Unix-specific
-uvloop==0.19.0; sys_platform != "win32"
- 
+uvloop; sys_platform != "win32"
+
 # ============================================================================
-# Version Pinning for Stability
+# Core Dependencies (ensuring compatibility)
 # ============================================================================
- 
+
 # Ensure compatibility by pinning critical dependencies
-certifi>=2023.7.22
-charset-normalizer>=3.3.0
-idna>=3.4
-sniffio>=1.3.0
-anyio>=4.0.0
- 
+certifi
+charset-normalizer
+idna
+sniffio
+anyio
+
 # ============================================================================
 # Security Updates
 # ============================================================================
- 
-# Keep these packages updated for security
-cryptography>=41.0.7
-urllib3>=2.0.7
-requests>=2.31.0
 
-#===========================================
-httpx
-uvicorn
-fastapi
+# Keep these packages updated for security
+cryptography 

@@ -455,17 +455,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-purple-900 bg-clip-text text-transparent">
-            Configuration Management
-          </h2>
-          <p className="text-gray-600 mt-1">
-            Configure environment-specific parameters for integration flows
-          </p>
-        </div>
-      </div>
+      {/* HEADER REMOVED as per new design */}
 
       {/* ENVIRONMENTS SECTION */}
       <Card>
@@ -522,7 +512,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Settings className="w-5 h-5 text-blue-600" />
-                <span>Packages and Integration Flows</span>
+                <span>Deployable Artifacts</span>
               </CardTitle>
               <div className="text-sm text-gray-500">
                 {packageGroups.length} package{packageGroups.length !== 1 ? 's' : ''} • {iflowConfigurations.length} iFlow{iflowConfigurations.length !== 1 ? 's' : ''}
@@ -645,7 +635,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
 
                         {/* Parameters Table */}
                         <div className="space-y-3">
-                          <h4 className="font-medium text-gray-900 text-left">Configuration Parameters</h4>
+                          <h4 className="font-medium text-gray-900 text-left">Externalized parameters</h4>
                           {selectedConfig.parameters.length > 0 ? (
                             <div className="border rounded-lg overflow-hidden">
                               <table className="w-full">

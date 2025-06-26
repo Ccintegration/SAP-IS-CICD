@@ -548,18 +548,11 @@ const Stage2IFlowList: React.FC<Stage2Props> = ({
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <span>Stage 2: Select Integration Flows</span>
-        </CardTitle>
-        <p className="text-sm text-gray-600">
-          Choose specific integration flows from your selected packages for deployment.
-        </p>
-      </CardHeader>
+      {/* CardHeader removed as per new design */}
 
       <CardContent className="space-y-6">
         {/* Search Input */}
-        <div className="relative">
+        <div className="relative mt-4">
           <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search integration flows by name or description..."

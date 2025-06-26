@@ -96,7 +96,7 @@ export const PackagesAndIntegrationFlows: React.FC<PackagesAndIntegrationFlowsPr
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Settings className="w-5 h-5 text-blue-600" />
-          <span>Packages and Integration Flows</span>
+          <span>Deployable Artifacts</span>
         </CardTitle>
         <div className="text-sm text-gray-500">
           {packageGroups.length} package{packageGroups.length !== 1 ? 's' : ''} • {iflowConfigurations.length} iFlow{iflowConfigurations.length !== 1 ? 's' : ''}

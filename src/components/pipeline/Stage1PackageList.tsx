@@ -206,31 +206,22 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <PackageIcon className="w-5 h-5" />
-          <span>Stage 1: Package Selection</span>
-        </CardTitle>
-        <p className="text-sm text-gray-600">
-          Select integration packages from your SAP Integration Suite tenant.
-          Package data loads incrementally for optimal performance.
-        </p>
-      </CardHeader>
-
       <CardContent className="space-y-6">
         {/* Search and Sort Controls */}
-        <PackageSearchAndSort
-          searchTerm={searchTerm}
-          onSearchChange={handleSearchChange}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSortFieldChange={handleSortFieldChange}
-          onSortDirectionChange={handleSortDirectionChange}
-          packagesPerPage={packagesPerPage}
-          onPackagesPerPageChange={handlePackagesPerPageChange}
-          onRefresh={handleRefresh}
-          isLoading={loading}
-        />
+        <div className="mt-4">
+          <PackageSearchAndSort
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSortFieldChange={handleSortFieldChange}
+            onSortDirectionChange={handleSortDirectionChange}
+            packagesPerPage={packagesPerPage}
+            onPackagesPerPageChange={handlePackagesPerPageChange}
+            onRefresh={handleRefresh}
+            isLoading={loading}
+          />
+        </div>
 
         {/* Loading indicator for search/sort */}
         {loading && paginationData && (
