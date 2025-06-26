@@ -18,6 +18,17 @@ import {
   ChevronRight,
   Database,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 // Import the backend client
 import { backendClient } from "@/lib/backend-client";
@@ -79,6 +90,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
   const [parameterValues, setParameterValues] = useState<Record<string, Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Environment configuration
   const environments: EnvironmentStatus[] = [
@@ -397,26 +409,18 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
 
   // Handle next step navigation
   const handleNext = () => {
+    setShowConfirm(true);
+  };
+
+  const handleConfirmNext = () => {
+    setShowConfirm(false);
     const dataToPass = {
-      ...data, // Keep existing data from previous stages
+      ...data,
       configurations: {},
       environment: selectedEnvironment,
       iflowConfigurations: iflowConfigurations,
-      iflowDetails: iflowConfigurations // Pass complete iFlow configurations including packageName
+      iflowDetails: iflowConfigurations
     };
-
-    console.log('🔄 Stage3 passing data to Stage4:', dataToPass);
-    console.log('📊 Stage3 - iflowConfigurations details:');
-    iflowConfigurations.forEach((config, index) => {
-      console.log(`  ${index + 1}. iFlow ID: ${config.iflowId}`);
-      console.log(`     iFlow Name: ${config.iflowName}`);
-      console.log(`     Package ID: ${config.packageId}`);
-      console.log(`     Package Name: ${config.packageName}`);
-      console.log(`     Version: ${config.version}`);
-      console.log(`     Parameters Count: ${config.parameters.length}`);
-      console.log('     ---');
-    });
-
     onComplete(dataToPass);
     onNext();
   };
@@ -495,7 +499,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
                       env.health === 'warning' ? 'bg-orange-500' : 'bg-red-500'
                   }`}></div>
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 text-left">
                   {env.configured} configured, {env.pending} pending
                 </div>
               </div>
@@ -514,7 +518,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
                 <Settings className="w-5 h-5 text-blue-600" />
                 <span>Deployable Artifacts</span>
               </CardTitle>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-500 text-left">
                 {packageGroups.length} package{packageGroups.length !== 1 ? 's' : ''} • {iflowConfigurations.length} iFlow{iflowConfigurations.length !== 1 ? 's' : ''}
               </div>
             </CardHeader>
@@ -545,7 +549,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
                                 <Package className="w-4 h-4 text-purple-600" />
                               </div>
                               <div className="text-left">
-                                <h4 className="font-medium text-sm text-gray-900">
+                                <h4 className="font-medium text-sm text-gray-900 break-words whitespace-normal max-w-full">
                                   {packageGroup.packageName}
                                 </h4>
                                 <p className="text-xs text-gray-500">
@@ -572,7 +576,7 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="text-left">
-                                    <h5 className="font-medium text-sm text-gray-900">
+                                    <h5 className="font-medium text-sm text-gray-900 break-words whitespace-normal max-w-full">
                                       {iflow.iflowName}
                                     </h5>
                                     <p className="text-xs text-gray-500 mt-1 text-left">
@@ -753,6 +757,27 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
           <CheckCircle className="w-4 h-4" />
           <span>✅ All {iflowConfigurations.length} iFlow configurations saved successfully to backend/configurations/PRD/iflow_configurations.csv</span>
         </div>
+      )}
+
+      {showConfirm && (
+        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Proceed to Design Validation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Please make sure to verify all the configurations and save them before proceeding to next step. Are you sure to goto next step?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel asChild>
+                <Button onClick={() => setShowConfirm(false)} variant="outline">No</Button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button onClick={handleConfirmNext}>Yes</Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

@@ -252,7 +252,7 @@ async def save_iflow_configurations(request: SaveConfigurationRequest):
                 # Try to get the type from the value if it's a tuple or dict, else default to 'xsd:string'
                 param_type = 'xsd:string'
                 if isinstance(param_value, dict) and 'type' in param_value:
-                    param_type = param_value['type']
+                    param_type = param_value['type']                # type: ignore
                 elif isinstance(param_value, tuple) and len(param_value) == 2:
                     param_type = param_value[1]
                 # If the value is just a string, keep xsd:string
@@ -397,7 +397,7 @@ async def get_design_guidelines(iflow_id: str, version: str, execution_id: Optio
 
     try:
         logger.info(f"Fetching design guidelines for iFlow: {iflow_id}, version: {version}, execution_id: {execution_id}")
-        guidelines = await sap_client.get_design_guidelines(iflow_id, version, execution_id)
+        guidelines = await sap_client.get_design_guidelines(iflow_id, version, execution_id)    # type: ignore
 
         return APIResponse(
             success=True,
@@ -540,6 +540,8 @@ async def get_integration_flows(package_ids: Optional[str] = None) -> APIRespons
 
         iflows = await sap_client.get_integration_flows(selected_package_ids if selected_package_ids else None)
 
+        print("Final flows returned to frontend:", iflows)  # Debug print
+
         return APIResponse(
             success=True,
             data=iflows,
@@ -580,9 +582,9 @@ async def get_paginated_packages(
             search_lower = search.lower()
             filtered_packages = [
                 pkg for pkg in all_packages
-                if (search_lower in pkg.get('Name', '').lower() or 
-                    search_lower in pkg.get('Description', '').lower() or
-                    search_lower in pkg.get('ModifiedBy', '').lower())
+                if (search_lower in pkg.Name.lower() or                 # type: ignore
+                    search_lower in pkg.Description.lower() or       # type: ignore
+                    search_lower in pkg.ModifiedBy.lower())          # type: ignore
             ]
         
         # Apply sorting
@@ -654,13 +656,13 @@ async def get_base_tenant_data() -> APIResponse:
         iflows_task = sap_client.get_integration_flows()
 
         packages, iflows = await asyncio.gather(packages_task, iflows_task)
-
+# type: ignore
         base_tenant_data = BaseTenantData(
             tenant_id="ccci-sandbox-001",
             tenant_name="CCCI_SANDBOX",
             packages=packages,
             iflows=iflows,
-            last_synced=datetime.now(),
+            last_synced=datetime.now(), # type: ignore  
             connection_status="connected"
         )
 

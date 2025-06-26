@@ -162,9 +162,11 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
             if (criticalDependencies > 5) riskLevel = "high";
             else if (criticalDependencies > 2) riskLevel = "medium";
 
+            let iflowName = iflowDetails.iflowName || iflowDetails.name || `iFlow ${iflowId}`;
+
             return {
               iflowId,
-              iflowName: iflowDetails.name,
+              iflowName,
               version: iflowDetails.version,
               resources,
               totalResources,
@@ -317,7 +319,7 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
               <GitBranch className="w-6 h-6 text-orange-600" />
             </div>
             <div>
-              <CardTitle className="text-2xl text-orange-800">
+              <CardTitle className="text-2xl text-orange-800 text-left">
                 Dependencies Analysis
               </CardTitle>
               <p className="text-orange-600 mt-1">
@@ -413,213 +415,67 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
       {/* Dependency Analysis */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <GitBranch className="w-5 h-5" />
-            <span>iFlow Dependency Analysis</span>
-          </CardTitle>
+          <CardTitle>Dependencies (Tabular View)</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue={dependencyResults[0]?.iflowId} className="w-full">
-            <TabsList
-              className="grid w-full"
-              style={{
-                gridTemplateColumns: `repeat(${dependencyResults.length}, 1fr)`,
-              }}
-            >
-              {dependencyResults.map((result) => (
-                <TabsTrigger
-                  key={result.iflowId}
-                  value={result.iflowId}
-                  className="text-sm flex flex-col items-center p-2"
-                >
-                  <span className="truncate">{result.iflowName}</span>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Badge className={getRiskBadgeColor(result.riskLevel)}>
-                      {result.riskLevel}
-                    </Badge>
-                    <Badge variant="secondary">{result.totalResources}</Badge>
-                  </div>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {dependencyResults.map((result) => (
-              <TabsContent
-                key={result.iflowId}
-                value={result.iflowId}
-                className="space-y-4"
-              >
-                {/* iFlow Summary */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="font-medium text-gray-900 mb-1">
-                        {result.iflowName}
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                        <p>
-                          <strong>ID:</strong> {result.iflowId}
-                        </p>
-                        <p>
-                          <strong>Version:</strong> {result.version}
-                        </p>
-                        <p>
-                          <strong>Total Resources:</strong>{" "}
-                          {result.totalResources}
-                        </p>
-                        <p>
-                          <strong>Critical Dependencies:</strong>{" "}
-                          {result.criticalDependencies}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <Badge
-                        className={`text-lg px-4 py-2 ${getRiskBadgeColor(result.riskLevel)}`}
-                      >
-                        {result.riskLevel.toUpperCase()} RISK
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Resource Categories */}
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(result.resources).map(([type, resources]) => (
-                    <Card key={type} className="border">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm flex items-center space-x-2">
-                          {getResourceIcon(type)}
-                          <span>{getResourceTitle(type)}</span>
-                          <Badge variant="secondary">{resources.length}</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        {resources.length === 0 ? (
-                          <p className="text-sm text-gray-500 italic">
-                            No {getResourceTitle(type).toLowerCase()} found
-                          </p>
-                        ) : (
-                          <div className="space-y-2 max-h-40 overflow-y-auto">
-                            {resources.map((resource, index) => (
-                              <div
-                                key={index}
-                                className="p-2 bg-gray-50 rounded text-sm"
-                              >
-                                <div className="font-medium truncate">
-                                  {resource.Name}
-                                </div>
-                                <div className="text-xs text-gray-600">
-                                  {resource.ResourceType}
-                                  {resource.Size && (
-                                    <span className="ml-2">
-                                      • {Math.round(resource.Size / 1024)}KB
-                                    </span>
-                                  )}
-                                </div>
-                                {resource.Description && (
-                                  <div className="text-xs text-gray-500 truncate mt-1">
-                                    {resource.Description}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {/* Critical Dependencies Details */}
-                {result.criticalDependencies > 0 && (
-                  <Card className="border-orange-200 bg-orange-50">
-                    <CardHeader>
-                      <CardTitle className="text-orange-800 flex items-center space-x-2">
-                        <AlertCircle className="w-5 h-5" />
-                        <span>Critical Dependencies</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {result.resources.external_services.length > 0 && (
-                          <div>
-                            <h4 className="font-medium text-orange-900 mb-2 flex items-center space-x-2">
-                              <ExternalLink className="w-4 h-4" />
-                              <span>
-                                External Services (
-                                {result.resources.external_services.length})
-                              </span>
-                            </h4>
-                            <div className="pl-6 space-y-1">
-                              {result.resources.external_services.map(
-                                (service, index) => (
-                                  <p
-                                    key={index}
-                                    className="text-sm text-orange-700"
-                                  >
-                                    • {service.Name}
-                                  </p>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {result.resources.process_direct.length > 0 && (
-                          <div>
-                            <h4 className="font-medium text-orange-900 mb-2 flex items-center space-x-2">
-                              <Network className="w-4 h-4" />
-                              <span>
-                                Process Direct Connections (
-                                {result.resources.process_direct.length})
-                              </span>
-                            </h4>
-                            <div className="pl-6 space-y-1">
-                              {result.resources.process_direct.map(
-                                (connection, index) => (
-                                  <p
-                                    key={index}
-                                    className="text-sm text-orange-700"
-                                  >
-                                    • {connection.Name}
-                                  </p>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {result.resources.value_mappings.length > 0 && (
-                          <div>
-                            <h4 className="font-medium text-orange-900 mb-2 flex items-center space-x-2">
-                              <Database className="w-4 h-4" />
-                              <span>
-                                Value Mappings (
-                                {result.resources.value_mappings.length})
-                              </span>
-                            </h4>
-                            <div className="pl-6 space-y-1">
-                              {result.resources.value_mappings.map(
-                                (mapping, index) => (
-                                  <p
-                                    key={index}
-                                    className="text-sm text-orange-700"
-                                  >
-                                    • {mapping.Name}
-                                  </p>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            ))}
-          </Tabs>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 border-b text-left">Package Name</th>
+                  <th className="px-4 py-2 border-b text-left">iFlow Name</th>
+                  <th className="px-4 py-2 border-b text-left">Version</th>
+                  <th className="px-4 py-2 border-b text-left">Dependencies</th>
+                  <th className="px-4 py-2 border-b text-left">Risk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dependencyResults.map((result) => {
+                  // Gather all dependencies/resources
+                  const allDeps = [
+                    ...result.resources.value_mappings,
+                    ...result.resources.groovy_scripts,
+                    ...result.resources.message_mappings,
+                    ...result.resources.external_services,
+                    ...result.resources.process_direct,
+                    ...result.resources.other,
+                  ];
+                  const depList = allDeps.length > 0
+                    ? allDeps.map((dep) => dep.Name).join(", ")
+                    : "No Resources Found";
+                  // Try to get package name from iflowDetails if available
+                  let packageName = "";
+                  if (data.iflowDetails) {
+                    const found = data.iflowDetails.find((i: any) => i.iflowId === result.iflowId || i.id === result.iflowId);
+                    packageName = found?.packageName || found?.packageId || "";
+                  }
+                  return (
+                    <tr key={result.iflowId} className="border-b">
+                      <td className="px-4 py-2 align-top text-left">{packageName}</td>
+                      <td className="px-4 py-2 align-top text-left">{result.iflowName}</td>
+                      <td className="px-4 py-2 align-top">{result.version}</td>
+                      <td className="px-4 py-2 align-top text-left">
+                        {allDeps.length > 0
+                          ? allDeps.map((dep, idx) => <div key={idx}>{dep.Name}</div>)
+                          : <div>No Resources Found</div>}
+                      </td>
+                      <td className="px-4 py-2 align-top">
+                        <span className={
+                          result.riskLevel === "high"
+                            ? "text-red-600 font-bold"
+                            : result.riskLevel === "medium"
+                              ? "text-yellow-600 font-semibold"
+                              : "text-green-600 font-medium"
+                        }>
+                          {result.riskLevel.charAt(0).toUpperCase() + result.riskLevel.slice(1)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 

@@ -68,7 +68,7 @@ export const useIFlowData = (selectedPackages: string[]): UseIFlowDataReturn => 
         name: sapIFlow.name,
         description: sapIFlow.description,
         packageId: sapIFlow.packageId,
-        packageName: (sapIFlow as any).packageName || sapIFlow.packageId, // Handle missing packageName
+        packageName: sapIFlow.packageName,
         status: sapIFlow.status,
         lastModified: sapIFlow.lastModified,
         version: sapIFlow.version,

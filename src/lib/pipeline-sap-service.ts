@@ -17,6 +17,7 @@ interface SAPIFlow {
   id: string;
   name: string;
   packageId: string;
+  packageName: string;
   description: string;
   version: string;
   status: "active" | "draft" | "error";
@@ -37,6 +38,8 @@ interface SAPIntegrationFlowResponse {
   version?: string;
   PackageId?: string;
   packageId?: string;
+  PackageName?: string;
+  packageName?: string;
   ModifiedBy?: string;
   modifiedBy?: string;
   CreatedBy?: string;
@@ -87,6 +90,17 @@ export class PipelineSAPService {
       iflow.Description || iflow.description || "No description available";
     const version = iflow.Version || iflow.version || "1.0.0";
     const packageId = iflow.PackageId || iflow.packageId || "";
+    const packageName = iflow.PackageName || iflow.packageName || packageId;
+    
+    // Debug logging
+    console.log('🔍 transformIFlow - Raw iflow object:', {
+      id,
+      name,
+      packageId,
+      rawPackageName: iflow.PackageName || iflow.packageName,
+      extractedPackageName: packageName
+    });
+    
     const modifiedBy =
       iflow.ModifiedBy ||
       iflow.modifiedBy ||
@@ -111,6 +125,7 @@ export class PipelineSAPService {
       id,
       name,
       packageId,
+      packageName,
       description,
       version,
       status: "active" as const, // SAP doesn't provide status in design-time artifacts
@@ -305,6 +320,11 @@ export class PipelineSAPService {
       console.log(
         `✅ Successfully fetched ${iflows.length} iFlows from SAP${packageIds ? ` (from ${packageIds.length} selected packages)` : ""}`,
       );
+
+      // Debug: Log the first raw iFlow object from backend response
+      if (iflows.length > 0) {
+        console.log('🔍 Raw backend response - First iFlow object:', iflows[0]);
+      }
 
       // Transform to pipeline format
       const transformedIFlows = iflows.map((iflow: SAPIntegrationFlowResponse) => 

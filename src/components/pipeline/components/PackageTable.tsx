@@ -186,7 +186,7 @@ const PackageTable: React.FC<PackageTableProps> = ({
               
               {/* Package Name Content - MOVED LEFT towards checkbox */}
               <div className="col-span-4 text-left -ml-9">
-                <div className="font-medium text-gray-900 truncate" title={pkg.name}>
+                <div className="font-medium text-gray-900 break-words whitespace-normal" title={pkg.name}>
                   {pkg.name}
                 </div>
                 <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">

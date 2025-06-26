@@ -94,19 +94,29 @@ const useIFlowData = (selectedPackages: string[]) => {
 
       const iflowsData = await PipelineSAPService.getIntegrationFlows(selectedPackageIds);
       
+      // Debug: Log the first raw iFlow object from backend response
+      if (iflowsData.length > 0) {
+        console.log('First raw iFlow from backend:', iflowsData[0]);
+      }
+
       // Transform SAPIFlow to IFlow format
       const transformedIFlows: IFlow[] = iflowsData.map(sapIFlow => ({
-        id: sapIFlow.id,
-        name: sapIFlow.name,
-        description: sapIFlow.description,
-        packageId: sapIFlow.packageId,
-        packageName: (sapIFlow as any).packageName || sapIFlow.packageId,
+        id: sapIFlow.id || (sapIFlow as any).Id,
+        name: sapIFlow.name || (sapIFlow as any).Name,
+        description: sapIFlow.description || (sapIFlow as any).Description,
+        packageId: sapIFlow.packageId || (sapIFlow as any).PackageId,
+        packageName: sapIFlow.packageName,
         status: sapIFlow.status,
         lastModified: sapIFlow.lastModified,
-        version: sapIFlow.version,
-        author: sapIFlow.author,
+        version: sapIFlow.version || (sapIFlow as any).Version,
+        author: sapIFlow.author || (sapIFlow as any).CreatedBy,
         type: sapIFlow.type as "http" | "mail" | "sftp" | "database" | "integration flow"
       }));
+
+      // Debug: Log packageName and packageId for each iFlow before grouping
+      transformedIFlows.forEach(iflow => {
+        console.log('Grouping iFlow:', { id: iflow.id, packageId: iflow.packageId, packageName: iflow.packageName });
+      });
 
       setIFlows(transformedIFlows);
 
@@ -115,16 +125,13 @@ const useIFlowData = (selectedPackages: string[]) => {
       
       transformedIFlows.forEach(iflow => {
         const packageId = iflow.packageId;
-        const packageName = iflow.packageName || packageId;
-        
         if (!packageMap.has(packageId)) {
           packageMap.set(packageId, {
             packageId,
-            packageName,
+            packageName: iflow.packageName || packageId,
             iflows: []
           });
         }
-        
         packageMap.get(packageId)!.iflows.push(iflow);
       });
 

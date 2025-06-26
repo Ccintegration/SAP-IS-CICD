@@ -207,8 +207,18 @@ class SAPClient:
                 # Create package objects for selected IDs
                 packages_to_scan = []
                 for pkg_id in selected_package_ids:
-                    # Create a minimal package object with just the ID we need
-                    packages_to_scan.append(type('Package', (), {'id': pkg_id, 'name': f'Package_{pkg_id}'})())
+                    if not pkg_id:
+                        continue
+                    try:
+                        pkg_details = await self.get_package_details(str(pkg_id))
+                        real_name = pkg_details.get('d', {}).get('Name') or ''
+                        if real_name:
+                            packages_to_scan.append(type('Package', (), {'id': str(pkg_id), 'name': real_name})())
+                        else:
+                            packages_to_scan.append(type('Package', (), {'id': str(pkg_id), 'name': f'Package_{pkg_id}'})())
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch package details for {pkg_id}: {e}")
+                        packages_to_scan.append(type('Package', (), {'id': str(pkg_id), 'name': f'Package_{pkg_id}'})())
             else:
                 logger.info("Fetching integration flows from all packages")
                 # Get all integration packages

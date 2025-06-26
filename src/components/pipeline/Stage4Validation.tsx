@@ -317,6 +317,9 @@ const Stage4Validation: React.FC<Stage4Props> = ({
   onNext,
   onPrevious,
 }) => {
+  // Debug logging for mapping issue
+  console.log("selectedPackages", data.selectedPackages);
+  console.log("iflowDetails", data.iflowDetails);
   const [validationResults, setValidationResults] = useState<IFlowValidation[]>(
     [],
   );
@@ -333,6 +336,10 @@ const Stage4Validation: React.FC<Stage4Props> = ({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+
+  useEffect(() => {
+    console.log("validationResults", validationResults);
+  }, [validationResults]);
 
   // Chart configuration
   const chartConfig = {
@@ -532,19 +539,40 @@ const Stage4Validation: React.FC<Stage4Props> = ({
     }));
   }, [validationResults]);
 
+  // Build packageNames map using iflowDetails and iflowConfigurations
+  const packageNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    
+    // First try iflowDetails
+    if (data.iflowDetails) {
+      data.iflowDetails.forEach((iflow: any) => {
+        if (iflow.iflowId && iflow.packageName) {
+          map[iflow.iflowId] = iflow.packageName;
+        } else if ((iflow.id || iflow.Id) && iflow.packageName) {
+          map[iflow.id || iflow.Id] = iflow.packageName;
+        }
+      });
+    }
+    
+    // Then try iflowConfigurations as fallback
+    if (data.iflowConfigurations) {
+      data.iflowConfigurations.forEach((iflow: any) => {
+        if (iflow.iflowId && iflow.packageName && !map[iflow.iflowId]) {
+          map[iflow.iflowId] = iflow.packageName;
+        }
+      });
+    }
+    
+    return map;
+  }, [data.iflowDetails, data.iflowConfigurations]);
+
   // Summary table data for table view
   const summaryTableData = useMemo(() => {
     return validationResults.map((result) => {
       const severityCompliance = calculateComplianceBySeverity(
         result.guidelines,
       );
-      
-      const packageName = data.selectedPackages?.find((pkg: any) =>
-        pkg.integrationFlows?.some((iflow: any) => 
-          iflow.id === result.iflowId || iflow.Id === result.iflowId
-        )
-      )?.name || "Unknown Package";
-
+      const packageName = packageNames[result.iflowId] || "Unknown Package";
       return {
         packageName,
         iflowName: result.iflowName,
@@ -557,7 +585,7 @@ const Stage4Validation: React.FC<Stage4Props> = ({
         version: result.version,
       };
     });
-  }, [validationResults, data.selectedPackages, data.iflowDetails]);
+  }, [validationResults, packageNames]);
 
   // Filtered guidelines for detailed view
   const filteredGuidelines = useMemo(() => {
@@ -628,16 +656,44 @@ const Stage4Validation: React.FC<Stage4Props> = ({
         data.selectedIFlows,
       );
 
+      // Debug: Log the data structure passed from Stage3
+      console.log("🔍 [LoadValidation] Data passed from Stage3:", {
+        selectedIFlows: data.selectedIFlows,
+        iflowDetails: data.iflowDetails,
+        iflowConfigurations: data.iflowConfigurations,
+        dataKeys: Object.keys(data)
+      });
+
       // Initialize results with basic iFlow information
       const initialResults = data.selectedIFlows.map((iflowId: string) => {
-        const iflowDetails = data.iflowDetails?.find(
+        // Try to find iFlow details from multiple possible sources
+        let iflowDetails = data.iflowDetails?.find(
           (iflow: any) => iflow.id === iflowId || iflow.Id === iflowId,
         );
 
+        // If not found in iflowDetails, try iflowConfigurations
+        if (!iflowDetails) {
+          iflowDetails = data.iflowConfigurations?.find(
+            (iflow: any) => iflow.iflowId === iflowId,
+          );
+        }
+
+        console.log(`🔍 [LoadValidation] Looking for iFlow ${iflowId}:`, {
+          foundInIFlowDetails: !!data.iflowDetails?.find((iflow: any) => iflow.id === iflowId || iflow.Id === iflowId),
+          foundInIFlowConfigurations: !!data.iflowConfigurations?.find((iflow: any) => iflow.iflowId === iflowId),
+          iflowDetails: iflowDetails
+        });
+
         const iflowVersion =
-          iflowDetails?.version || iflowDetails?.Version || "active";
+          iflowDetails?.version || iflowDetails?.Version || "N/A";
         const iflowName =
-          iflowDetails?.name || iflowDetails?.Name || `iFlow ${iflowId}`;
+          iflowDetails?.name || iflowDetails?.Name || iflowDetails?.iflowName || `iFlow ${iflowId}`;
+
+        console.log(`🔍 [LoadValidation] Extracted for ${iflowId}:`, {
+          iflowName,
+          iflowVersion,
+          source: iflowDetails ? 'found' : 'fallback'
+        });
 
         return {
           iflowId,
@@ -662,11 +718,20 @@ const Stage4Validation: React.FC<Stage4Props> = ({
       // Execute guidelines for all iFlows
       for (const iflowId of data.selectedIFlows) {
         if (!executed[iflowId]) {
-          const iflowDetails = data.iflowDetails?.find(
+          // Try to find iFlow details from multiple possible sources
+          let iflowDetails = data.iflowDetails?.find(
             (iflow: any) => iflow.id === iflowId || iflow.Id === iflowId,
           );
+
+          // If not found in iflowDetails, try iflowConfigurations
+          if (!iflowDetails) {
+            iflowDetails = data.iflowConfigurations?.find(
+              (iflow: any) => iflow.iflowId === iflowId,
+            );
+          }
+
           const iflowVersion =
-            iflowDetails?.version || iflowDetails?.Version || "active";
+            iflowDetails?.version || iflowDetails?.Version || "N/A";
 
           try {
             // Execute design guidelines
@@ -775,11 +840,20 @@ const Stage4Validation: React.FC<Stage4Props> = ({
 
       for (const iflowId of data.selectedIFlows) {
         try {
-          const iflowDetails = data.iflowDetails?.find(
+          // Try to find iFlow details from multiple possible sources
+          let iflowDetails = data.iflowDetails?.find(
             (iflow: any) => iflow.id === iflowId || iflow.Id === iflowId,
           );
+
+          // If not found in iflowDetails, try iflowConfigurations
+          if (!iflowDetails) {
+            iflowDetails = data.iflowConfigurations?.find(
+              (iflow: any) => iflow.iflowId === iflowId,
+            );
+          }
+
           const iflowVersion =
-            iflowDetails?.version || iflowDetails?.Version || "active";
+            iflowDetails?.version || iflowDetails?.Version || "N/A";
 
           let fetchUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/design-guidelines?version=${iflowVersion}`;
           const fetchResponse = await fetch(fetchUrl);
@@ -849,13 +923,6 @@ const Stage4Validation: React.FC<Stage4Props> = ({
   };
 
   const handleExportCSV = () => {
-    const packageNames: Record<string, string> = {};
-    data.selectedPackages?.forEach((pkg: any) => {
-      pkg.integrationFlows?.forEach((iflow: any) => {
-        packageNames[iflow.id || iflow.Id] = pkg.name;
-      });
-    });
-
     const csvContent = exportToCSV(validationResults, packageNames);
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
     downloadFile(
@@ -912,7 +979,7 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                   <Shield className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl text-green-800">
+                  <CardTitle className="text-2xl text-green-800 text-left">
                     Design Guidelines Validation
                   </CardTitle>
                   <p className="text-green-600 mt-1">
@@ -1274,75 +1341,33 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                         <TableRow>
                           <TableHead>Package</TableHead>
                           <TableHead>iFlow</TableHead>
-                          <TableHead>Version</TableHead>
-                          <TableHead className="text-center">High (%)</TableHead>
-                          <TableHead className="text-center">Medium (%)</TableHead>
-                          <TableHead className="text-center">Low (%)</TableHead>
-                          <TableHead className="text-center">Overall (%)</TableHead>
-                          <TableHead className="text-center">Status</TableHead>
+                          <TableHead className="min-w-[60px] px-2 text-center">Version</TableHead>
+                          <TableHead className="min-w-[60px] px-2 text-center">High</TableHead>
+                          <TableHead className="min-w-[60px] px-2 text-center">Medium</TableHead>
+                          <TableHead className="min-w-[60px] px-2 text-center">Low</TableHead>
+                          <TableHead className="min-w-[60px] px-2 text-center">Overall</TableHead>
+                          <TableHead className="min-w-[60px] px-2 text-center">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {summaryTableData.map((row) => (
                           <TableRow key={row.iflowId}>
-                            <TableCell className="font-medium">
-                              {row.packageName}
+                            <TableCell className="font-medium text-left px-2">{row.packageName}</TableCell>
+                            <TableCell className="text-left px-2">{row.iflowName}</TableCell>
+                            <TableCell className="px-2 text-center">{row.version}</TableCell>
+                            <TableCell className="px-2 text-center">
+                              <Badge className={row.high >= 80 ? "bg-green-100 text-green-800" : row.high >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.high}%</Badge>
                             </TableCell>
-                            <TableCell>{row.iflowName}</TableCell>
-                            <TableCell>{row.version}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                className={
-                                  row.high >= 80
-                                    ? "bg-green-100 text-green-800"
-                                    : row.high >= 60
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }
-                              >
-                                {row.high}%
-                              </Badge>
+                            <TableCell className="px-2 text-center">
+                              <Badge className={row.medium >= 80 ? "bg-green-100 text-green-800" : row.medium >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.medium}%</Badge>
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                className={
-                                  row.medium >= 80
-                                    ? "bg-green-100 text-green-800"
-                                    : row.medium >= 60
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }
-                              >
-                                {row.medium}%
-                              </Badge>
+                            <TableCell className="px-2 text-center">
+                              <Badge className={row.low >= 80 ? "bg-green-100 text-green-800" : row.low >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.low}%</Badge>
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                className={
-                                  row.low >= 80
-                                    ? "bg-green-100 text-green-800"
-                                    : row.low >= 60
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }
-                              >
-                                {row.low}%
-                              </Badge>
+                            <TableCell className="px-2 text-center">
+                              <Badge className={row.total >= 80 ? "bg-green-100 text-green-800" : row.total >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.total}%</Badge>
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                className={
-                                  row.total >= 80
-                                    ? "bg-green-100 text-green-800"
-                                    : row.total >= 60
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }
-                              >
-                                {row.total}%
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="px-2 text-center">
                               {row.total === 100 ? (
                                 <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                               ) : (
