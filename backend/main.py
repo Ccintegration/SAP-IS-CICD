@@ -231,78 +231,71 @@ CONFIGURATIONS_DIR.mkdir(exist_ok=True)
 async def save_iflow_configurations(request: SaveConfigurationRequest):
     """
     Save iFlow configurations to CSV file
-    Creates separate CSV files for each environment
+    Creates two files in the environment folder: iflow_configuration.csv and iflow_configuration_<ENV>.csv
     """
     try:
-        # Generate filename based on environment and timestamp
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"iflow_configurations_{request.environment}_{timestamp_str}.csv"
-        filepath = CONFIGURATIONS_DIR / filename
-        
-        # Also create/update a latest file for each environment
-        latest_filename = f"iflow_configurations_{request.environment}_latest.csv"
-        latest_filepath = CONFIGURATIONS_DIR / latest_filename
-        
+        # Create environment-specific directory
+        env_dir = CONFIGURATIONS_DIR / request.environment.upper()
+        env_dir.mkdir(parents=True, exist_ok=True)
+
+        # File names
+        file1 = env_dir / "iflow_configuration.csv"
+        file2 = env_dir / f"iflow_configuration_{request.environment.upper()}.csv"
+
         # Prepare CSV data
         csv_data = []
-        
         for iflow in request.iflows:
-            # Create a row for each configuration parameter
             for param_key, param_value in iflow.configurations.items():
+                # Try to get the type from the value if it's a tuple or dict, else default to 'xsd:string'
+                param_type = 'xsd:string'
+                if isinstance(param_value, dict) and 'type' in param_value:
+                    param_type = param_value['type']
+                elif isinstance(param_value, tuple) and len(param_value) == 2:
+                    param_type = param_value[1]
+                # If the value is just a string, keep xsd:string
                 csv_data.append({
-                    'Environment': request.environment,
-                    'Timestamp': request.timestamp,
                     'iFlow_ID': iflow.iflowId,
                     'iFlow_Name': iflow.iflowName,
                     'iFlow_Version': iflow.version,
                     'Parameter_Key': param_key,
-                    'Parameter_Value': param_value,
+                    'Parameter_Value': param_value if not isinstance(param_value, (dict, tuple)) else (param_value[0] if isinstance(param_value, tuple) else param_value.get('value', '')),
+                    'Parameter_Type': param_type,
                     'Saved_At': datetime.now().isoformat()
                 })
-        
-        # Define CSV headers
+
+        # Define CSV headers (no Environment, no Timestamp)
         headers = [
-            'Environment',
-            'Timestamp', 
             'iFlow_ID',
             'iFlow_Name',
             'iFlow_Version',
             'Parameter_Key',
             'Parameter_Value',
+            'Parameter_Type',
             'Saved_At'
         ]
-        
-        # Write to timestamped file
-        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=headers, delimiter='|')
-            writer.writeheader()
-            writer.writerows(csv_data)
-        
-        # Write to latest file (overwrite previous)
-        with open(latest_filepath, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=headers, delimiter='|')
-            writer.writeheader()
-            writer.writerows(csv_data)
-        
-        # Log the save operation
-        logger.info(f"✅ Saved {len(csv_data)} configuration parameters to {filename}")
-        logger.info(f"📁 Files created: {filepath}, {latest_filepath}")
-        
+
+        # Write both files
+        for path in [file1, file2]:
+            with open(path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=headers, delimiter='|')
+                writer.writeheader()
+                writer.writerows(csv_data)
+
+        logger.info(f"✅ Saved {len(csv_data)} configuration parameters to {file1} and {file2}")
+
         return {
             "success": True,
             "message": f"Successfully saved {len(csv_data)} configuration parameters",
             "data": {
-                "filename": filename,
-                "latest_filename": latest_filename,
-                "filepath": str(filepath),
-                "latest_filepath": str(latest_filepath),
+                "file1": str(file1),
+                "file2": str(file2),
                 "total_parameters": len(csv_data),
                 "total_iflows": len(request.iflows),
                 "environment": request.environment
             },
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to save configurations: {str(e)}")
         raise HTTPException(
