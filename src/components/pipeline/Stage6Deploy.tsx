@@ -322,13 +322,15 @@ const Stage6Deploy: React.FC<Stage6Props> = ({ data, onComplete, onNext, onPrevi
                 {artifacts.map((artifact) => (
                   <TableRow key={artifact.iflowId} className="hover:bg-gray-50">
                     <TableCell>
-                      <div className="space-y-1">
-                        <div className="font-medium text-gray-900">{artifact.iflowName}</div>
-                        <div className="text-sm text-gray-500">
-                          ID: {artifact.iflowId} • Version: {artifact.version}
+                      <div className="space-y-1 text-left">
+                        <div className="text-xs text-gray-500 break-words whitespace-normal max-w-[30ch]">
+                          <span className="font-semibold">Package Name:</span> {artifact.packageName}
                         </div>
-                        <div className="text-xs text-gray-400">
-                          Package: {artifact.packageName}
+                        <div className="text-sm text-gray-900 break-words whitespace-normal max-w-[30ch]">
+                          <span className="font-semibold">iFlow Name:</span> {artifact.iflowName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          <span className="font-semibold">Version:</span> {artifact.version}
                         </div>
                       </div>
                     </TableCell>
