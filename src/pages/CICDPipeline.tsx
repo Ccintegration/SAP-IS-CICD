@@ -37,9 +37,8 @@ import Stage2IFlowList from "@/components/pipeline/Stage2IFlowList";
 import Stage3Configuration from "@/components/pipeline/Stage3Configuration";
 import Stage4Validation from "@/components/pipeline/Stage4Validation";
 import Stage5Dependencies from "@/components/pipeline/Stage5Dependencies";
-import Stage6Upload from "@/components/pipeline/Stage6Upload";
-import Stage7Deploy from "@/components/pipeline/Stage7Deploy";
-import Stage8Testing from "@/components/pipeline/Stage8Testing";
+import Stage6Deploy from "@/components/pipeline/Stage6Deploy";
+import Stage7Testing from "@/components/pipeline/Stage7Testing";
 
 const CICDPipeline = () => {
   const [currentStage, setCurrentStage] = useState(1);
@@ -108,31 +107,21 @@ const CICDPipeline = () => {
     },
     {
       id: 6,
-      title: "Upload Artifacts",
-      shortTitle: "Upload",
-      description: "Upload to SAP Integration Suite",
-      icon: Upload,
-      component: Stage6Upload,
-      color: "from-orange-500 to-orange-600",
-      lightColor: "from-orange-50 to-orange-100",
-    },
-    {
-      id: 7,
       title: "Deploy",
       shortTitle: "Deploy",
-      description: "Deploy from design-time to runtime",
+      description: "Upload and deploy to SAP Integration Suite",
       icon: Rocket,
-      component: Stage7Deploy,
+      component: Stage6Deploy,
       color: "from-yellow-500 to-yellow-600",
       lightColor: "from-yellow-50 to-yellow-100",
     },
     {
-      id: 8,
+      id: 7,
       title: "Testing",
       shortTitle: "Testing",
       description: "Execute test suite and generate report",
       icon: TestTube,
-      component: Stage8Testing,
+      component: Stage7Testing,
       color: "from-green-500 to-green-600",
       lightColor: "from-green-50 to-green-100",
     },

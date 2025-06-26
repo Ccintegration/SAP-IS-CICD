@@ -13,11 +13,14 @@ from typing import List, Optional, Dict, Any
 import httpx
 import asyncio
 import logging
+import math
 from datetime import datetime, timedelta
 import os
 import json
 import csv
 from pathlib import Path
+import base64
+import uuid
 
 from config import Settings, get_settings
 from sap_client import SAPClient, SAPCredentials
@@ -811,6 +814,253 @@ async def get_backend_config() -> APIResponse:
         timestamp=datetime.now().isoformat()
     )
 
+# Deployment Models
+class DeploymentArtifact(BaseModel):
+    iflowId: str
+    iflowName: str
+    version: str
+    packageName: str
+
+class BatchDeploymentRequest(BaseModel):
+    artifacts: List[DeploymentArtifact]
+    target_environment: str = "CCCI_PROD"
+    deployment_id: Optional[str] = None
+
+class DeploymentProgress(BaseModel):
+    iflowId: str
+    iflowName: str
+    version: str
+    packageName: str
+    uploadStatus: str = "pending"
+    uploadProgress: int = 0
+    configureStatus: str = "pending"
+    configureProgress: int = 0
+    deployStatus: str = "pending"
+    deployProgress: int = 0
+    overallStatus: str = "pending"
+    message: str = "Ready for deployment"
+    errorMessage: Optional[str] = None
+    startTime: Optional[str] = None
+    endTime: Optional[str] = None
+
+class BatchDeploymentResponse(BaseModel):
+    deployment_id: str
+    target_environment: str
+    total_artifacts: int
+    status: str
+    progress: List[DeploymentProgress]
+    start_time: str
+    estimated_completion: Optional[str] = None
+
+# Global deployment tracking
+deployment_sessions: Dict[str, BatchDeploymentResponse] = {}
+
+@app.post("/api/sap/deploy/batch", response_model=BatchDeploymentResponse)
+async def batch_deploy_artifacts(request: BatchDeploymentRequest) -> BatchDeploymentResponse:
+    """Deploy multiple iFlows to target environment with real-time progress tracking"""
+    global deployment_sessions
+
+    try:
+        # Generate deployment ID
+        deployment_id = request.deployment_id or f"deploy_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(deployment_sessions)}"
+        
+        # Initialize deployment progress
+        progress = [
+            DeploymentProgress(
+                iflowId=artifact.iflowId,
+                iflowName=artifact.iflowName,
+                version=artifact.version,
+                packageName=artifact.packageName
+            )
+            for artifact in request.artifacts
+        ]
+
+        deployment_response = BatchDeploymentResponse(
+            deployment_id=deployment_id,
+            target_environment=request.target_environment,
+            total_artifacts=len(request.artifacts),
+            status="initialized",
+            progress=progress,
+            start_time=datetime.now().isoformat()
+        )
+
+        # Store deployment session
+        deployment_sessions[deployment_id] = deployment_response
+
+        # Start deployment process asynchronously
+        asyncio.create_task(execute_batch_deployment(deployment_id, request.artifacts, request.target_environment))
+
+        return deployment_response
+
+    except Exception as e:
+        logger.error(f"Failed to initialize batch deployment: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize batch deployment: {str(e)}"
+        )
+
+async def execute_batch_deployment(deployment_id: str, artifacts: List[DeploymentArtifact], target_environment: str):
+    """Execute batch deployment with real-time progress updates"""
+    global deployment_sessions
+
+    try:
+        deployment = deployment_sessions[deployment_id]
+        deployment.status = "in-progress"
+
+        # Instantiate dynamic clients for both tenants
+        source_tenant_info = load_tenant_credentials("CCCI_SANDBOX")
+        target_tenant_info = load_tenant_credentials("CCCI_PROD")
+        source_client = SAPDynamicClient(source_tenant_info)
+        target_client = SAPDynamicClient(target_tenant_info)
+
+        for i, artifact in enumerate(artifacts):
+            try:
+                progress_item = deployment.progress[i]
+                progress_item.overallStatus = "in-progress"
+                progress_item.startTime = datetime.now().isoformat()
+                progress_item.message = "Starting deployment process..."
+
+                # Step 1: Fetch artifact from CCCI_SANDBOX
+                progress_item.uploadStatus = "fetching"
+                progress_item.message = "Fetching artifact from CCCI_SANDBOX..."
+                artifact_content = await source_client.fetch_iflow_artifact(artifact.iflowId, artifact.version)
+                progress_item.uploadStatus = "completed"
+                progress_item.uploadProgress = 100
+                progress_item.message = "Artifact fetched, ensuring package exists in CCCI_PROD..."
+
+                # Step 2: Ensure package exists in CCCI_PROD
+                progress_item.configureStatus = "checking"
+                progress_item.message = "Checking if package exists in CCCI_PROD..."
+                package_exists = await target_client.package_exists(artifact.packageName)
+                if not package_exists:
+                    # Fetch package details from source
+                    source_package_data = await source_client.get_package_details(artifact.packageName)
+                    # Use only the 'd' property if present (OData)
+                    if 'd' in source_package_data:
+                        source_package_data = source_package_data['d']
+                    await target_client.create_package_from_source(source_package_data)
+                progress_item.configureStatus = "completed"
+                progress_item.configureProgress = 100
+                progress_item.message = "Package ready, uploading or updating iFlow..."
+
+                # Step 3: Upload or update iFlow in CCCI_PROD
+                iflow_exists = await target_client.iflow_exists(artifact.iflowId, artifact.version)
+                if iflow_exists:
+                    await target_client.update_iflow(artifact.iflowId, artifact.version, artifact.packageName, artifact_content, artifact.iflowName)
+                else:
+                    await target_client.upload_iflow(artifact.iflowId, artifact.version, artifact.packageName, artifact_content, artifact.iflowName)
+                progress_item.message = "iFlow uploaded/updated, applying configuration..."
+
+                # Step 4: Apply configuration from CSV
+                progress_item.configureStatus = "configuring"
+                progress_item.message = "Applying configuration parameters..."
+                # Map tenant to ENV folder
+                if target_environment == "CCCI_PROD":
+                    env_folder = "PRD"
+                elif target_environment == "CCCI_SANDBOX":
+                    env_folder = "SANDBOX"
+                else:
+                    env_folder = target_environment  # fallback, e.g., DEV, TST
+                config_csv_path = os.path.join(os.path.dirname(__file__), "configurations", env_folder, "iflow_configuration.csv")
+                parameters = []
+                with open(config_csv_path, newline="") as csvfile:
+                    reader = csv.DictReader(csvfile, delimiter="|")
+                    for row in reader:
+                        if row["iFlow_ID"] == artifact.iflowId and row["iFlow_Version"] == artifact.version:
+                            parameters.append(row)
+                if parameters:
+                    await target_client.batch_update_iflow_config(artifact.iflowId, artifact.version, parameters)
+                    progress_item.configureStatus = "completed"
+                    progress_item.configureProgress = 100
+                    progress_item.message = "Configuration applied successfully. Ready to deploy."
+                else:
+                    progress_item.configureStatus = "failed"
+                    progress_item.message = "No configuration parameters found for this iFlow/version."
+                    progress_item.errorMessage = "No configuration parameters found."
+                    progress_item.configureProgress = 0
+
+                # Step 5: Deploy iFlow in CCCI_PROD
+                progress_item.deployStatus = "deploying"
+                progress_item.deployProgress = 10
+                progress_item.message = "Deploying iFlow to runtime..."
+                deploy_result = await target_client.deploy_iflow(artifact.iflowId, artifact.version, target_environment)
+                if deploy_result.get("status") == "deployed":
+                    progress_item.deployStatus = "completed"
+                    progress_item.deployProgress = 100
+                    progress_item.message = deploy_result.get("message", "Deployment started.")
+                    progress_item.overallStatus = "completed"
+                    progress_item.endTime = datetime.now().isoformat()
+                else:
+                    progress_item.deployStatus = "failed"
+                    progress_item.deployProgress = 0
+                    progress_item.message = deploy_result.get("message", "Deployment failed.")
+                    progress_item.errorMessage = deploy_result.get("message", "Deployment failed.")
+                    progress_item.overallStatus = "failed"
+                    progress_item.endTime = datetime.now().isoformat()
+
+            except Exception as e:
+                logger.error(f"Failed to deploy artifact {artifact.iflowId}: {str(e)}")
+                progress_item.overallStatus = "failed"
+                progress_item.errorMessage = str(e)
+                progress_item.message = f"Deployment failed: {str(e)}"
+                progress_item.endTime = datetime.now().isoformat()
+
+        # Update final deployment status
+        completed_count = sum(1 for p in deployment.progress if p.overallStatus == "completed")
+        failed_count = sum(1 for p in deployment.progress if p.overallStatus == "failed")
+        
+        if failed_count == 0:
+            deployment.status = "completed"
+        elif completed_count == 0:
+            deployment.status = "failed"
+        else:
+            deployment.status = "partial"
+
+        deployment.estimated_completion = datetime.now().isoformat()
+
+    except Exception as e:
+        logger.error(f"Batch deployment failed: {str(e)}")
+        deployment.status = "failed"
+        deployment.estimated_completion = datetime.now().isoformat()
+
+@app.get("/api/sap/deploy/status/{deployment_id}", response_model=BatchDeploymentResponse)
+async def get_deployment_status(deployment_id: str) -> BatchDeploymentResponse:
+    """Get real-time deployment status and progress"""
+    global deployment_sessions
+
+    if deployment_id not in deployment_sessions:
+        raise HTTPException(status_code=404, detail="Deployment session not found")
+
+    return deployment_sessions[deployment_id]
+
+@app.get("/api/sap/deploy/sessions")
+async def list_deployment_sessions() -> APIResponse:
+    """List all active deployment sessions"""
+    global deployment_sessions
+
+    sessions = []
+    for deployment_id, deployment in deployment_sessions.items():
+        completed_count = sum(1 for p in deployment.progress if p.overallStatus == "completed")
+        failed_count = sum(1 for p in deployment.progress if p.overallStatus == "failed")
+        
+        sessions.append({
+            "deployment_id": deployment_id,
+            "target_environment": deployment.target_environment,
+            "total_artifacts": deployment.total_artifacts,
+            "completed_artifacts": completed_count,
+            "failed_artifacts": failed_count,
+            "status": deployment.status,
+            "start_time": deployment.start_time,
+            "estimated_completion": deployment.estimated_completion
+        })
+
+    return APIResponse(
+        success=True,
+        data=sessions,
+        message=f"Retrieved {len(sessions)} deployment sessions",
+        timestamp=datetime.now().isoformat()
+    )
+
 # Error handlers
 
 @app.exception_handler(HTTPException)
@@ -839,6 +1089,210 @@ async def general_exception_handler(request, exc):
             "timestamp": datetime.now().isoformat()
         }
     )
+
+def load_tenant_credentials(tenant_name: str):
+    tenants_path = os.path.join(os.path.dirname(__file__), "tenants.json")
+    with open(tenants_path, "r") as f:
+        tenants = json.load(f)
+    if tenant_name not in tenants:
+        raise Exception(f"Tenant '{tenant_name}' not found in tenants.json")
+    return tenants[tenant_name]
+
+class SAPDynamicClient:
+    """A dynamic SAP client that can be instantiated with different credentials."""
+    def __init__(self, tenant_info):
+        self.base_url = tenant_info["baseUrl"]
+        self.client_id = tenant_info["oauthCredentials"]["clientId"]
+        self.client_secret = tenant_info["oauthCredentials"]["clientSecret"]
+        self.token_url = tenant_info["oauthCredentials"]["tokenUrl"]
+        self.oauth_token = None
+        self.token_expiry = None
+
+    async def _get_auth_headers(self):
+        if not self.oauth_token or self._is_token_expired():
+            await self._refresh_token()
+        return {
+            "Authorization": f"Bearer {self.oauth_token}",
+            "Accept": "application/json"
+        }
+
+    def _is_token_expired(self):
+        if not self.token_expiry:
+            return True
+        return datetime.now() + timedelta(seconds=60) >= self.token_expiry
+
+    async def _refresh_token(self):
+        logger.info(f"Requesting new access token for {self.base_url}")
+        auth = (self.client_id, self.client_secret)
+        data = {"grant_type": "client_credentials"}
+        async with httpx.AsyncClient() as client:
+            response = await client.post(self.token_url, auth=auth, data=data)
+            response.raise_for_status()
+            token_data = response.json()
+            self.oauth_token = token_data["access_token"]
+            expires_in = int(token_data["expires_in"])
+            self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
+            logger.info("Successfully obtained access token")
+
+    async def fetch_iflow_artifact(self, iflow_id, version):
+        # Download iFlow artifact from source tenant
+        endpoint = f"/api/v1/IntegrationDesigntimeArtifacts(Id='{iflow_id}',Version='{version}')/$value"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.content  # Return binary artifact
+
+    async def package_exists(self, package_id):
+        endpoint = f"/api/v1/IntegrationPackages('{package_id}')"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            return response.status_code == 200
+
+    async def get_package_details(self, package_id):
+        endpoint = f"/api/v1/IntegrationPackages('{package_id}')"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def create_package_from_source(self, source_package_data):
+        # Only include allowed fields for creation
+        allowed_fields = [
+            "Id", "Name", "ShortText", "Description", "Vendor", "SupportedPlatform",
+            "Version", "Products", "Keywords", "Countries", "Industries", "LineOfBusiness"
+        ]
+        payload = {k: v for k, v in source_package_data.items() if k in allowed_fields and v}
+        endpoint = "/api/v1/IntegrationPackages"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        headers["Content-Type"] = "application/json"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.status_code == 201
+
+    async def iflow_exists(self, iflow_id, version):
+        endpoint = f"/api/v1/IntegrationDesigntimeArtifacts(Id='{iflow_id}',Version='{version}')"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            return response.status_code == 200
+
+    async def upload_iflow(self, iflow_id, version, package_id, artifact_content, iflow_name=None):
+        # Create iFlow artifact in target tenant (POST with base64-encoded content in JSON body)
+        endpoint = f"/api/v1/IntegrationDesigntimeArtifacts"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        headers["Content-Type"] = "application/json"
+        artifact_b64 = base64.b64encode(artifact_content).decode("utf-8")
+        payload = {
+            "Name": iflow_name or iflow_id,
+            "Id": iflow_id,
+            "PackageId": package_id,
+            "ArtifactContent": artifact_b64
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code not in [200, 201, 202]:
+                raise Exception(f"Failed to upload iFlow: {response.status_code} {response.text}")
+            return True
+
+    async def update_iflow(self, iflow_id, version, package_id, artifact_content, iflow_name=None):
+        # Update iFlow artifact in target tenant (PUT with JSON body and base64-encoded content)
+        endpoint = f"/api/v1/IntegrationDesigntimeArtifacts(Id='{iflow_id}',Version='{version}')"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        headers["Content-Type"] = "application/json"
+        headers["Accept"] = "application/json"
+        artifact_b64 = base64.b64encode(artifact_content).decode("utf-8")
+        payload = {
+            "Name": iflow_name or iflow_id,
+            "ArtifactContent": artifact_b64
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.put(url, headers=headers, json=payload)
+            if response.status_code not in [200, 201, 202]:
+                raise Exception(f"Failed to update iFlow: {response.status_code} {response.text}")
+            return True
+
+    async def update_iflow_config_param(self, iflow_id, version, param_key, param_value, param_type, csrf_token=None):
+        # Update a single configuration parameter
+        endpoint = f"/api/v1/IntegrationDesigntimeArtifacts(Id='{iflow_id}',Version='{version}')/$links/Configurations('{param_key}')"
+        url = self.base_url + endpoint
+        headers = await self._get_auth_headers()
+        headers["Content-Type"] = "application/json"
+        headers["Accept"] = "application/json"
+        if csrf_token:
+            headers["x-csrf-token"] = csrf_token
+        payload = {
+            "ParameterKey": param_key,
+            "ParameterValue": param_value,
+            "DataType": param_type
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.put(url, headers=headers, json=payload)
+            if response.status_code not in [200, 201, 202]:
+                raise Exception(f"Failed to update parameter '{param_key}': {response.status_code} {response.text}")
+            return True
+
+    async def batch_update_iflow_config(self, iflow_id, version, parameters, csrf_token=None):
+        # Update each parameter individually and report failures
+        logger.info(f"Starting single-parameter configuration update for iFlow: {iflow_id}, version: {version}")
+        logger.info(f"Processing {len(parameters)} configuration parameters")
+        failures = []
+        for i, param in enumerate(parameters):
+            param_key = param["Parameter_Key"]
+            param_value = param["Parameter_Value"]
+            param_type = param["Parameter_Type"]
+            logger.info(f"Updating parameter {i+1}/{len(parameters)}: Key='{param_key}', Value='{param_value}', Type='{param_type}'")
+            try:
+                await self.update_iflow_config_param(iflow_id, version, param_key, param_value, param_type, csrf_token)
+                logger.info(f"Successfully updated parameter '{param_key}'")
+            except Exception as e:
+                logger.error(str(e))
+                failures.append({
+                    "ParameterKey": param_key,
+                    "Error": str(e)
+                })
+        if failures:
+            logger.error(f"Failed to update {len(failures)} parameters: {failures}")
+            raise Exception(f"Some parameters failed to update: {failures}")
+        logger.info(f"All configuration parameters updated successfully for iFlow: {iflow_id}")
+        return True
+
+    async def deploy_iflow(self, iflow_id, version, target_environment=None):
+        # Deploy integration flow to runtime (activate it) using correct SAP endpoint and query params
+        logger.info(f"Deploying iFlow: {iflow_id}, version: {version} to {target_environment or self.base_url}")
+        # Both Id and Version must be in single quotes in the query string
+        url = f"{self.base_url}/api/v1/DeployIntegrationDesigntimeArtifact?Id='" + iflow_id + "'&Version='" + version + "'"
+        headers = await self._get_auth_headers()
+        headers["x-csrf-token"] = "fetch"  # Let SAP handle token fetch if not present
+        headers["Accept"] = "application/json"
+        # No JSON body required
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers)
+            if response.status_code in [200, 202]:
+                logger.info(f"Successfully triggered deployment for {iflow_id}")
+                return {
+                    "status": "deployed",
+                    "message": f"Deployment started for {iflow_id}",
+                    "target_environment": target_environment or self.base_url,
+                    "deployment_id": response.headers.get("Location", "")
+                }
+            else:
+                logger.warning(f"Failed to deploy {iflow_id}: {response.status_code}")
+                return {
+                    "status": "failed",
+                    "message": f"Deployment failed: {response.status_code} {response.text}",
+                    "target_environment": target_environment or self.base_url
+                }
 
 if __name__ == "__main__":
     import uvicorn

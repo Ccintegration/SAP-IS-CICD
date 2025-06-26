@@ -92,10 +92,21 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
       const dependencyPromises = data.selectedIFlows.map(
         async (iflowId: string) => {
           try {
-            // Find the iflow details from previous stage data
-            const iflowDetails = data.iflowDetails?.find(
-              (iflow: any) => iflow.id === iflowId,
-            ) || { id: iflowId, name: `iFlow ${iflowId}`, version: "1.0.0" };
+            // Robustly find the iflow details from previous stage data
+            let iflowDetails = data.iflowDetails?.find(
+              (iflow: any) => iflow.id === iflowId || iflow.iflowId === iflowId,
+            );
+            if (!iflowDetails) {
+              console.warn(
+                `[Dependencies] No details found for iFlow ${iflowId} in iflowDetails. Defaulting version to '1.0.0'.`,
+              );
+              iflowDetails = { id: iflowId, name: `iFlow ${iflowId}`, version: "1.0.0" };
+            } else if (!iflowDetails.version) {
+              console.warn(
+                `[Dependencies] No version found for iFlow ${iflowId}. Defaulting version to '1.0.0'.`,
+              );
+              iflowDetails.version = "1.0.0";
+            }
 
             console.log(
               `🔗 [Dependencies] Fetching resources for ${iflowId} from: http://localhost:8000/api/sap/iflows/${iflowId}/resources?version=${iflowDetails.version}`,

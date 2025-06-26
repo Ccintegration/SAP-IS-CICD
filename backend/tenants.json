@@ -1,0 +1,22 @@
+{
+  "CCCI_SANDBOX": {
+    "id": "ccci-sandbox-001",
+    "name": "CCCI_SANDBOX",
+    "baseUrl": "https://ccci-integration-suite-fuom1yo5.it-cpi024.cfapps.eu10-002.hana.ondemand.com",
+    "oauthCredentials": {
+      "clientId": "sb-4d88ec4d-cf00-4e40-b9a3-bf20640f4941!b236015|it!b182722",
+      "clientSecret": "68998671-12de-4a2c-ab02-8968d571b4cd$1hejXEfNv1qrX8raaVfuD_x-6PtP1xub7uRFmr55gaI=",
+      "tokenUrl": "https://ccci-integration-suite-fuom1yo5.authentication.eu10.hana.ondemand.com/oauth/token"
+    }
+  },
+  "CCCI_PROD": {
+    "id": "ccci-production-001",
+    "name": "CCCI_PROD",
+    "baseUrl": "https://a14a85e9trial.it-cpitrial06.cfapps.us10-001.hana.ondemand.com",
+    "oauthCredentials": {
+      "clientId": "sb-24806f7d-784e-4d5e-a6b6-8a968dab1180!b468172|it!b55215",
+      "clientSecret": "c1e126ea-f38c-4e7f-8ade-ea495e2b1672$-6syu_4NZaWRIrW8Zd3CuCBbunB6zM6DhvpJC9mvOBE=",
+      "tokenUrl": "https://a14a85e9trial.authentication.us10.hana.ondemand.com/oauth/token"
+    }
+  }
+} 

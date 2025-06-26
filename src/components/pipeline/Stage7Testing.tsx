@@ -64,7 +64,7 @@ interface Stage8Props {
   onPrevious: () => void;
 }
 
-const Stage8Testing: React.FC<Stage8Props> = ({
+const Stage7Testing: React.FC<Stage8Props> = ({
   data,
   onComplete,
   onNext,
@@ -1032,4 +1032,4 @@ Test Cases:
   );
 };
 
-export default Stage8Testing;
+export default Stage7Testing;
