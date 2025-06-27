@@ -26,6 +26,7 @@ interface ArtifactStatus {
   iflowId: string;
   iflowName: string;
   version: string;
+  packageId: string;
   packageName: string;
   uploadStatus: 'pending' | 'uploading' | 'completed' | 'failed';
   uploadProgress: number;
@@ -78,6 +79,7 @@ const Stage6Deploy: React.FC<Stage6Props> = ({ data, onComplete, onNext, onPrevi
         id: iflowId, 
         name: `iFlow ${iflowId}`, 
         version: "1.0.0",
+        packageId: iflowId,
         packageName: "Unknown Package"
       };
 
@@ -85,6 +87,7 @@ const Stage6Deploy: React.FC<Stage6Props> = ({ data, onComplete, onNext, onPrevi
         iflowId,
         iflowName: iflowDetail.name || iflowDetail.iflowName || `iFlow ${iflowId}`,
         version: iflowDetail.version || "1.0.0",
+        packageId: iflowDetail.packageId,
         packageName: iflowDetail.packageName || "Unknown Package",
         uploadStatus: 'pending',
         uploadProgress: 0,
@@ -186,6 +189,7 @@ const Stage6Deploy: React.FC<Stage6Props> = ({ data, onComplete, onNext, onPrevi
           iflowId: artifact.iflowId,
           iflowName: artifact.iflowName,
           version: artifact.version,
+          packageId: artifact.packageId,
           packageName: artifact.packageName
         })),
         target_environment: selectedEnvironment

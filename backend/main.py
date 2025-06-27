@@ -821,6 +821,7 @@ class DeploymentArtifact(BaseModel):
     iflowId: str
     iflowName: str
     version: str
+    packageId: str
     packageName: str
 
 class BatchDeploymentRequest(BaseModel):
@@ -832,6 +833,7 @@ class DeploymentProgress(BaseModel):
     iflowId: str
     iflowName: str
     version: str
+    packageId: str
     packageName: str
     uploadStatus: str = "pending"
     uploadProgress: int = 0
@@ -872,6 +874,7 @@ async def batch_deploy_artifacts(request: BatchDeploymentRequest) -> BatchDeploy
                 iflowId=artifact.iflowId,
                 iflowName=artifact.iflowName,
                 version=artifact.version,
+                packageId=artifact.packageId,
                 packageName=artifact.packageName
             )
             for artifact in request.artifacts
@@ -933,10 +936,10 @@ async def execute_batch_deployment(deployment_id: str, artifacts: List[Deploymen
                 # Step 2: Ensure package exists in CCCI_PROD
                 progress_item.configureStatus = "checking"
                 progress_item.message = "Checking if package exists in CCCI_PROD..."
-                package_exists = await target_client.package_exists(artifact.packageName)
+                package_exists = await target_client.package_exists(artifact.packageId)
                 if not package_exists:
                     # Fetch package details from source
-                    source_package_data = await source_client.get_package_details(artifact.packageName)
+                    source_package_data = await source_client.get_package_details(artifact.packageId)
                     # Use only the 'd' property if present (OData)
                     if 'd' in source_package_data:
                         source_package_data = source_package_data['d']
@@ -948,9 +951,9 @@ async def execute_batch_deployment(deployment_id: str, artifacts: List[Deploymen
                 # Step 3: Upload or update iFlow in CCCI_PROD
                 iflow_exists = await target_client.iflow_exists(artifact.iflowId, artifact.version)
                 if iflow_exists:
-                    await target_client.update_iflow(artifact.iflowId, artifact.version, artifact.packageName, artifact_content, artifact.iflowName)
+                    await target_client.update_iflow(artifact.iflowId, artifact.version, artifact.packageId, artifact_content, artifact.iflowName)
                 else:
-                    await target_client.upload_iflow(artifact.iflowId, artifact.version, artifact.packageName, artifact_content, artifact.iflowName)
+                    await target_client.upload_iflow(artifact.iflowId, artifact.version, artifact.packageId, artifact_content, artifact.iflowName)
                 progress_item.message = "iFlow uploaded/updated, applying configuration..."
 
                 # Step 4: Apply configuration from CSV
