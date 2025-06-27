@@ -5,6 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   GitBranch,
   Package,
   FileCode,
@@ -71,6 +79,7 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
 
   useEffect(() => {
     loadDependencies();
@@ -426,7 +435,6 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
                   <th className="px-4 py-2 border-b text-left">iFlow Name</th>
                   <th className="px-4 py-2 border-b text-left">Version</th>
                   <th className="px-4 py-2 border-b text-left">Dependencies</th>
-                  <th className="px-4 py-2 border-b text-left">Risk</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,17 +466,6 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
                         {allDeps.length > 0
                           ? allDeps.map((dep, idx) => <div key={idx}>{dep.Name}</div>)
                           : <div>No Resources Found</div>}
-                      </td>
-                      <td className="px-4 py-2 align-top">
-                        <span className={
-                          result.riskLevel === "high"
-                            ? "text-red-600 font-bold"
-                            : result.riskLevel === "medium"
-                              ? "text-yellow-600 font-semibold"
-                              : "text-green-600 font-medium"
-                        }>
-                          {result.riskLevel.charAt(0).toUpperCase() + result.riskLevel.slice(1)}
-                        </span>
                       </td>
                     </tr>
                   );
@@ -592,20 +589,7 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
 
           <Button
             onClick={() => {
-              onComplete({
-                dependencies: {
-                  results: dependencyResults,
-                  totalResources: getTotalResources(),
-                  criticalDependencies: getTotalCriticalDependencies(),
-                  highRiskIFlows: highRiskIFlows.map((iflow) => ({
-                    id: iflow.iflowId,
-                    name: iflow.iflowName,
-                    risk: iflow.riskLevel,
-                    criticalCount: iflow.criticalDependencies,
-                  })),
-                },
-              });
-              onNext();
+              setShowWarningDialog(true);
             }}
             className="flex items-center space-x-2"
           >
@@ -614,6 +598,50 @@ const Stage5Dependencies: React.FC<Stage5Props> = ({
           </Button>
         </div>
       </div>
+
+      {/* Warning Dialog */}
+      <Dialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              <span>Deployment Warning</span>
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              Before going for Deployments, Make sure that All dependencies related to iFlow such as External, Internal APIs, Process Calls, Shared Objects like Security Materials, Script Collections, Certificates, etc pre-requisites are taken care. Are you sure to go for Deployment?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowWarningDialog(false)}
+            >
+              No
+            </Button>
+            <Button
+              onClick={() => {
+                setShowWarningDialog(false);
+                onComplete({
+                  dependencies: {
+                    results: dependencyResults,
+                    totalResources: getTotalResources(),
+                    criticalDependencies: getTotalCriticalDependencies(),
+                    highRiskIFlows: highRiskIFlows.map((iflow) => ({
+                      id: iflow.iflowId,
+                      name: iflow.iflowName,
+                      risk: iflow.riskLevel,
+                      criticalCount: iflow.criticalDependencies,
+                    })),
+                  },
+                });
+                onNext();
+              }}
+            >
+              Yes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

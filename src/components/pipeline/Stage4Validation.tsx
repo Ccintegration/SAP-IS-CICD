@@ -302,6 +302,10 @@ interface IFlowValidation {
   lastExecuted?: string;
   hasExecutionHistory: boolean;
   executionId?: string;
+  high?: string;
+  medium?: string;
+  low?: string;
+  complianceStatus?: string;
 }
 
 interface Stage4Props {
@@ -569,18 +573,16 @@ const Stage4Validation: React.FC<Stage4Props> = ({
   // Summary table data for table view
   const summaryTableData = useMemo(() => {
     return validationResults.map((result) => {
-      const severityCompliance = calculateComplianceBySeverity(
-        result.guidelines,
-      );
       const packageName = packageNames[result.iflowId] || "Unknown Package";
       return {
         packageName,
         iflowName: result.iflowName,
         iflowId: result.iflowId,
-        high: severityCompliance.High.percentage,
-        medium: severityCompliance.Medium.percentage,
-        low: severityCompliance.Low.percentage,
-        total: result.compliancePercentage,
+        high: result.high ?? "NA",
+        medium: result.medium ?? "NA",
+        low: result.low ?? "NA",
+        total: result.compliancePercentage ?? "NA",
+        status: result.complianceStatus ?? "NA",
         guidelines: result.guidelines,
         version: result.version,
       };
@@ -773,16 +775,15 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                 mapApiResponseToInterface,
               );
 
-              // Calculate metrics from mapped guidelines
-              const totalRules = mappedGuidelines.length;
-              const compliantRules = mappedGuidelines.filter(
-                (g) => g.Status === "PASSED",
-              ).length;
-              const compliancePercentage =
-                totalRules > 0
-                  ? Math.round((compliantRules / totalRules) * 100)
-                  : 0;
-              const isCompliant = compliancePercentage === 100;
+              // Use backend-calculated metrics
+              const totalRules = validationData.total_rules ?? mappedGuidelines.length;
+              const compliantRules = validationData.compliant_rules ?? mappedGuidelines.filter((g) => g.Status === "PASSED").length;
+              const compliancePercentage = validationData.compliance_percentage ?? 0;
+              const isCompliant = validationData.is_compliant ?? false;
+              const high = validationData.high ?? "NA";
+              const medium = validationData.medium ?? "NA";
+              const low = validationData.low ?? "NA";
+              const complianceStatus = validationData.compliance_status ?? "NA";
 
               // Update results for this specific iFlow
               setValidationResults((prev) =>
@@ -795,6 +796,10 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                         compliantRules,
                         compliancePercentage,
                         isCompliant,
+                        high,
+                        medium,
+                        low,
+                        complianceStatus,
                         hasExecutionHistory: mappedGuidelines.length > 0,
                         lastExecuted:
                           validationData.last_executed ||
@@ -855,7 +860,31 @@ const Stage4Validation: React.FC<Stage4Props> = ({
           const iflowVersion =
             iflowDetails?.version || iflowDetails?.Version || "N/A";
 
+          // Step 1: Execute guidelines to get execution_id
+          const executeUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/execute-guidelines?version=${iflowVersion}`;
+          const executeResponse = await fetch(executeUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+
+          if (!executeResponse.ok) {
+            throw new Error(
+              `Failed to execute design guidelines for ${iflowId}: ${executeResponse.status}`,
+            );
+          }
+
+          const executeResult = await executeResponse.json();
+          const executionId = executeResult.data?.execution_id;
+
+          // Wait for execution to complete
+          await new Promise((resolve) => setTimeout(resolve, 8000));
+
+          // Step 2: Fetch guidelines with execution_id
           let fetchUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/design-guidelines?version=${iflowVersion}`;
+          if (executionId) {
+            fetchUrl += `&execution_id=${executionId}`;
+          }
+
           const fetchResponse = await fetch(fetchUrl);
 
           if (fetchResponse.ok) {
@@ -866,15 +895,15 @@ const Stage4Validation: React.FC<Stage4Props> = ({
               validationData.guidelines || []
             ).map(mapApiResponseToInterface);
 
-            const refreshTotalRules = refreshMappedGuidelines.length;
-            const refreshCompliantRules = refreshMappedGuidelines.filter(
-              (g) => g.Status === "PASSED",
-            ).length;
-            const refreshCompliancePercentage =
-              refreshTotalRules > 0
-                ? Math.round((refreshCompliantRules / refreshTotalRules) * 100)
-                : 0;
-            const refreshIsCompliant = refreshCompliancePercentage === 100;
+            // Use backend-calculated metrics
+            const totalRules = validationData.total_rules ?? refreshMappedGuidelines.length;
+            const compliantRules = validationData.compliant_rules ?? refreshMappedGuidelines.filter((g) => g.Status === "PASSED").length;
+            const compliancePercentage = validationData.compliance_percentage ?? 0;
+            const isCompliant = validationData.is_compliant ?? false;
+            const high = validationData.high ?? "NA";
+            const medium = validationData.medium ?? "NA";
+            const low = validationData.low ?? "NA";
+            const complianceStatus = validationData.compliance_status ?? "NA";
 
             setValidationResults((prev) =>
               prev.map((result) =>
@@ -882,15 +911,19 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                   ? {
                       ...result,
                       guidelines: refreshMappedGuidelines,
-                      totalRules: refreshTotalRules,
-                      compliantRules: refreshCompliantRules,
-                      compliancePercentage: refreshCompliancePercentage,
-                      isCompliant: refreshIsCompliant,
+                      totalRules,
+                      compliantRules,
+                      compliancePercentage,
+                      isCompliant,
+                      high,
+                      medium,
+                      low,
+                      complianceStatus,
                       hasExecutionHistory: refreshMappedGuidelines.length > 0,
                       lastExecuted:
-                        fetchResult.data.last_executed ||
+                        validationData.last_executed ||
                         new Date().toISOString(),
-                      executionId: fetchResult.data.execution_id,
+                      executionId: validationData.execution_id,
                     }
                   : result,
               ),
@@ -1328,10 +1361,19 @@ const Stage4Validation: React.FC<Stage4Props> = ({
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TableIcon className="w-5 h-5 text-indigo-600" />
-                  <span>Compliance Summary by iFlow</span>
-                </CardTitle>
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center space-x-2">
+                    <TableIcon className="w-5 h-5 text-indigo-600" />
+                    <span>Compliance Summary by iFlow</span>
+                  </CardTitle>
+                  <div className="flex items-center space-x-4">
+                    <span className="flex items-center"><span className="mr-1">🔴</span>Unacceptable</span>
+                    <span className="flex items-center"><span className="mr-1">🟠</span>Poor</span>
+                    <span className="flex items-center"><span className="mr-1">🟡</span>Moderate</span>
+                    <span className="flex items-center"><span className="mr-1">🔵</span>Good</span>
+                    <span className="flex items-center"><span className="mr-1">🟢</span>Excellent</span>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {summaryTableData.length > 0 ? (
@@ -1355,24 +1397,28 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                             <TableCell className="font-medium text-left px-2">{row.packageName}</TableCell>
                             <TableCell className="text-left px-2">{row.iflowName}</TableCell>
                             <TableCell className="px-2 text-center">{row.version}</TableCell>
-                            <TableCell className="px-2 text-center">
-                              <Badge className={row.high >= 80 ? "bg-green-100 text-green-800" : row.high >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.high}%</Badge>
-                            </TableCell>
-                            <TableCell className="px-2 text-center">
-                              <Badge className={row.medium >= 80 ? "bg-green-100 text-green-800" : row.medium >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.medium}%</Badge>
-                            </TableCell>
-                            <TableCell className="px-2 text-center">
-                              <Badge className={row.low >= 80 ? "bg-green-100 text-green-800" : row.low >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.low}%</Badge>
-                            </TableCell>
-                            <TableCell className="px-2 text-center">
-                              <Badge className={row.total >= 80 ? "bg-green-100 text-green-800" : row.total >= 60 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}>{row.total}%</Badge>
-                            </TableCell>
-                            <TableCell className="px-2 text-center">
-                              {row.total === 100 ? (
-                                <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                              ) : (
-                                <XCircle className="w-5 h-5 text-red-500 mx-auto" />
-                              )}
+                            <TableCell className="min-w-[60px] px-2 text-center">{typeof row.high === "number" ? row.high + "%" : row.high}</TableCell>
+                            <TableCell className="min-w-[60px] px-2 text-center">{typeof row.medium === "number" ? row.medium + "%" : row.medium}</TableCell>
+                            <TableCell className="min-w-[60px] px-2 text-center">{typeof row.low === "number" ? row.low + "%" : row.low}</TableCell>
+                            <TableCell className="min-w-[60px] px-2 text-center">{typeof row.total === "number" ? row.total + "%" : row.total}</TableCell>
+                            <TableCell className="min-w-[60px] px-2 text-center">
+                              {(() => {
+                                switch (row.status) {
+                                  case "Unacceptable":
+                                    return <span title="Unacceptable">🔴</span>;
+                                  case "Poor":
+                                    return <span title="Poor">🟠</span>;
+                                  case "Moderate":
+                                    return <span title="Moderate">🟡</span>;
+                                  case "Good":
+                                    return <span title="Good">🔵</span>;
+                                  case "Excellent":
+                                    return <span title="Excellent">🟢</span>;
+                                  case "NA":
+                                  default:
+                                    return <span title="N/A">—</span>;
+                                }
+                              })()}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1403,13 +1449,16 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                       </div>
                       <div className="bg-red-50 p-4 rounded-lg text-center">
                         <div className="text-2xl font-bold text-red-600">
-                          {Math.round(
-                            summaryTableData.reduce(
-                              (sum, row) => sum + row.high,
-                              0,
-                            ) / summaryTableData.length,
-                          )}
-                          %
+                          {(() => {
+                            const highs = summaryTableData.map(row => row.high);
+                            const numericHighs = highs.filter(h => typeof h === "number") as number[];
+                            if (numericHighs.length > 0) {
+                              const avg = Math.round(numericHighs.reduce((sum, h) => sum + h, 0) / numericHighs.length);
+                              return `${avg}%`;
+                            } else {
+                              return "NA";
+                            }
+                          })()}
                         </div>
                         <div className="text-sm text-red-700">
                           Avg High Compliance

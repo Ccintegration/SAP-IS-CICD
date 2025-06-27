@@ -351,18 +351,57 @@ class SAPClient:
                     if detailed_response.status_code == 200:
                         detailed_data = detailed_response.json()
                         guidelines = detailed_data.get("d", {}).get("DesignGuidelines", {}).get("results", [])
-                        
-                        # Calculate compliance
+
+                        # Calculate compliance and severity breakdown
                         total_rules = len(guidelines)
-                        compliant_rules = len([g for g in guidelines if g.get("Status") == "PASSED"])
-                        compliance_percentage = (compliant_rules / total_rules * 100) if total_rules > 0 else 0
+                        applicable_guidelines = [g for g in guidelines if g.get("Applicability", "").lower() == "applicable"]
+                        applicable_rules = len(applicable_guidelines)
+
+                        def pct(n, d):
+                            return int(round((n * 100) / d)) if d else "NA"
+
+                        # Severity counts among applicable
+                        high_applicable = [g for g in applicable_guidelines if g.get("Severity", "").lower() == "high"]
+                        medium_applicable = [g for g in applicable_guidelines if g.get("Severity", "").lower() == "medium"]
+                        low_applicable = [g for g in applicable_guidelines if g.get("Severity", "").lower() == "low"]
+
+                        # Compliance among applicable
+                        compliant_applicable = [g for g in applicable_guidelines if g.get("Compliance", "").lower() == "compliant"]
+
+                        high_pct = pct(len(high_applicable), applicable_rules) if applicable_rules else "NA"
+                        medium_pct = pct(len(medium_applicable), applicable_rules) if applicable_rules else "NA"
+                        low_pct = pct(len(low_applicable), applicable_rules) if applicable_rules else "NA"
+                        compliance_percentage = pct(len(compliant_applicable), applicable_rules) if applicable_rules else "NA"
+
+                        # Compliance status
+                        if applicable_rules == 0 or compliance_percentage == "NA":
+                            compliance_status = "NA"
+                        else:
+                            cp = int(compliance_percentage)
+                            if cp <= 20:
+                                compliance_status = "Unacceptable"
+                            elif 21 <= cp <= 40:
+                                compliance_status = "Poor"
+                            elif 41 <= cp <= 60:
+                                compliance_status = "Moderate"
+                            elif 61 <= cp <= 80:
+                                compliance_status = "Good"
+                            elif 81 <= cp <= 100:
+                                compliance_status = "Excellent"
+                            else:
+                                compliance_status = "NA"
 
                         return {
                             "guidelines": guidelines,
                             "total_rules": total_rules,
-                            "compliant_rules": compliant_rules,
+                            "applicable_rules": applicable_rules,
+                            "high": high_pct,
+                            "medium": medium_pct,
+                            "low": low_pct,
                             "compliance_percentage": compliance_percentage,
-                            "is_compliant": compliance_percentage >= 75,
+                            "compliance_status": compliance_status,
+                            "compliant_rules": len(compliant_applicable),
+                            "is_compliant": compliance_percentage != "NA" and int(compliance_percentage) >= 75,
                             "execution_id": execution_id,
                             "last_executed": detailed_data.get("d", {}).get("ExecutionDate", "")
                         }
@@ -388,17 +427,56 @@ class SAPClient:
                                 detailed_data = detailed_response.json()
                                 guidelines = detailed_data.get("d", {}).get("DesignGuidelines", {}).get("results", [])
                                 
-                                # Calculate compliance
+                                # Calculate compliance and severity breakdown
                                 total_rules = len(guidelines)
-                                compliant_rules = len([g for g in guidelines if g.get("Status") == "PASSED"])
-                                compliance_percentage = (compliant_rules / total_rules * 100) if total_rules > 0 else 0
+                                applicable_guidelines = [g for g in guidelines if g.get("Applicability", "").lower() == "applicable"]
+                                applicable_rules = len(applicable_guidelines)
+
+                                def pct(n, d):
+                                    return int(round((n * 100) / d)) if d else "NA"
+
+                                # Severity counts among applicable
+                                high_applicable = [g for g in applicable_guidelines if g.get("Severity", "").lower() == "high"]
+                                medium_applicable = [g for g in applicable_guidelines if g.get("Severity", "").lower() == "medium"]
+                                low_applicable = [g for g in applicable_guidelines if g.get("Severity", "").lower() == "low"]
+
+                                # Compliance among applicable
+                                compliant_applicable = [g for g in applicable_guidelines if g.get("Compliance", "").lower() == "compliant"]
+
+                                high_pct = pct(len(high_applicable), applicable_rules) if applicable_rules else "NA"
+                                medium_pct = pct(len(medium_applicable), applicable_rules) if applicable_rules else "NA"
+                                low_pct = pct(len(low_applicable), applicable_rules) if applicable_rules else "NA"
+                                compliance_percentage = pct(len(compliant_applicable), applicable_rules) if applicable_rules else "NA"
+
+                                # Compliance status
+                                if applicable_rules == 0 or compliance_percentage == "NA":
+                                    compliance_status = "NA"
+                                else:
+                                    cp = int(compliance_percentage)
+                                    if cp <= 20:
+                                        compliance_status = "Unacceptable"
+                                    elif 21 <= cp <= 40:
+                                        compliance_status = "Poor"
+                                    elif 41 <= cp <= 60:
+                                        compliance_status = "Moderate"
+                                    elif 61 <= cp <= 80:
+                                        compliance_status = "Good"
+                                    elif 81 <= cp <= 100:
+                                        compliance_status = "Excellent"
+                                    else:
+                                        compliance_status = "NA"
 
                                 return {
                                     "guidelines": guidelines,
                                     "total_rules": total_rules,
-                                    "compliant_rules": compliant_rules,
+                                    "applicable_rules": applicable_rules,
+                                    "high": high_pct,
+                                    "medium": medium_pct,
+                                    "low": low_pct,
                                     "compliance_percentage": compliance_percentage,
-                                    "is_compliant": compliance_percentage >= 75,
+                                    "compliance_status": compliance_status,
+                                    "compliant_rules": len(compliant_applicable),
+                                    "is_compliant": compliance_percentage != "NA" and int(compliance_percentage) >= 75,
                                     "execution_id": latest_execution_id,
                                     "last_executed": latest_execution.get("ExecutionDate", "")
                                 }
@@ -407,8 +485,13 @@ class SAPClient:
                 return {
                     "guidelines": [], 
                     "total_rules": 0, 
-                    "compliant_rules": 0, 
-                    "compliance_percentage": 0, 
+                    "applicable_rules": 0, 
+                    "high": "NA",
+                    "medium": "NA",
+                    "low": "NA",
+                    "compliance_percentage": "NA",
+                    "compliance_status": "NA",
+                    "compliant_rules": 0,
                     "is_compliant": False, 
                     "execution_id": None
                 }
@@ -418,8 +501,13 @@ class SAPClient:
             return {
                 "guidelines": [], 
                 "total_rules": 0, 
-                "compliant_rules": 0, 
-                "compliance_percentage": 0, 
+                "applicable_rules": 0, 
+                "high": "NA",
+                "medium": "NA",
+                "low": "NA",
+                "compliance_percentage": "NA",
+                "compliance_status": "NA",
+                "compliant_rules": 0,
                 "is_compliant": False, 
                 "execution_id": None
             }
