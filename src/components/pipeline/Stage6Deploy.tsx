@@ -418,7 +418,16 @@ const Stage6Deploy: React.FC<Stage6Props> = ({ data, onComplete, onNext, onPrevi
             onComplete({ 
               deploymentStatus: { 
                 complete: processComplete,
-                artifacts: artifacts,
+                results: artifacts.map(a => ({
+                  iflowId: a.iflowId,
+                  iflowName: a.iflowName,
+                  version: a.version,
+                  status: a.overallStatus === 'completed' ? 'deployed' : a.overallStatus,
+                  packageId: a.packageId,
+                  packageName: a.packageName,
+                  message: a.message,
+                  errorMessage: a.errorMessage
+                })),
                 environment: selectedEnvironment,
                 deploymentId: deploymentId
               } 

@@ -53,6 +53,7 @@ const CICDPipeline = () => {
     deploymentStatus: {},
     testResults: {},
   });
+  const [pipelineCompleted, setPipelineCompleted] = useState(false);
 
   const stages = [
     {
@@ -134,13 +135,19 @@ const CICDPipeline = () => {
     return "pending";
   };
 
-  const progressPercentage = (completedStages.length / stages.length) * 100;
+  const progressPercentage = Math.floor((completedStages.length / stages.length) * 100);
 
   const handleStageComplete = (stageId: number, data: any) => {
     setCompletedStages((prev) => [...prev, stageId]);
-    setPipelineData((prev) => ({ ...prev, ...data }));
+    if (stageId === 6 && data.deploymentStatus) {
+      setPipelineData((prev) => ({ ...prev, ...data, deploymentResults: data.deploymentStatus }));
+    } else {
+      setPipelineData((prev) => ({ ...prev, ...data }));
+    }
     if (stageId < stages.length) {
       setCurrentStage(stageId + 1);
+    } else if (stageId === stages.length) {
+      setPipelineCompleted(true);
     }
   };
 
@@ -151,6 +158,19 @@ const CICDPipeline = () => {
   };
 
   const CurrentStageComponent = stages[currentStage - 1]?.component;
+
+  if (pipelineCompleted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
+        <h2 className="text-3xl font-bold mb-2">Pipeline Completed!</h2>
+        <p className="text-lg text-gray-700 mb-6">
+          All stages of your SAP CI/CD pipeline have been successfully completed.
+        </p>
+        {/* Optionally, add a button to start a new pipeline or view results */}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -181,7 +201,7 @@ const CICDPipeline = () => {
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
               <div className="text-center">
                 <div className="text-3xl font-bold">
-                  {Math.round(progressPercentage)}%
+                  {Math.min(progressPercentage, 100)}%
                 </div>
                 <div className="text-sm text-blue-100">Complete</div>
               </div>
@@ -207,7 +227,7 @@ const CICDPipeline = () => {
               <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
                 <div
                   className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-700 shadow-lg opacity-90"
-                  style={{ width: `${progressPercentage}%` }}
+                  style={{ width: `${Math.min(progressPercentage, 100)}%` }}
                 ></div>
               </div>
             </div>
@@ -352,7 +372,7 @@ const CICDPipeline = () => {
               onNext={() =>
                 setCurrentStage(Math.min(currentStage + 1, stages.length))
               }
-              onPrevious={() => setCurrentStage(Math.max(currentStage - 1, 1))}
+              {...(currentStage > 1 ? { onPrevious: () => setCurrentStage(Math.max(currentStage - 1, 1)) } : {})}
             />
           )}
         </CardContent>

@@ -905,7 +905,7 @@ async def batch_deploy_artifacts(request: BatchDeploymentRequest) -> BatchDeploy
         )
 
 async def execute_batch_deployment(deployment_id: str, artifacts: List[DeploymentArtifact], target_environment: str):
-    """Execute batch deployment with real-time progress updates"""
+    """Execute batch deployment with real-time progress updates using parallel execution"""
     global deployment_sessions
 
     try:
@@ -918,12 +918,15 @@ async def execute_batch_deployment(deployment_id: str, artifacts: List[Deploymen
         source_client = SAPDynamicClient(source_tenant_info)
         target_client = SAPDynamicClient(target_tenant_info)
 
-        for i, artifact in enumerate(artifacts):
+        async def deploy_single_artifact(artifact: DeploymentArtifact, index: int):
+            """Helper function to deploy a single artifact"""
+            progress_item = deployment.progress[index]
+            progress_item.overallStatus = "in-progress"
+            progress_item.startTime = datetime.now().isoformat()
+            progress_item.message = "Starting deployment process..."
+
             try:
-                progress_item = deployment.progress[i]
-                progress_item.overallStatus = "in-progress"
-                progress_item.startTime = datetime.now().isoformat()
-                progress_item.message = "Starting deployment process..."
+                logger.info(f"🚀 [ParallelDeploy] Starting deployment for {artifact.iflowId}")
 
                 # Step 1: Fetch artifact from CCCI_SANDBOX
                 progress_item.uploadStatus = "fetching"
@@ -995,6 +998,7 @@ async def execute_batch_deployment(deployment_id: str, artifacts: List[Deploymen
                     progress_item.message = deploy_result.get("message", "Deployment started.")
                     progress_item.overallStatus = "completed"
                     progress_item.endTime = datetime.now().isoformat()
+                    logger.info(f"✅ [ParallelDeploy] Successfully deployed {artifact.iflowId}")
                 else:
                     progress_item.deployStatus = "failed"
                     progress_item.deployProgress = 0
@@ -1002,13 +1006,21 @@ async def execute_batch_deployment(deployment_id: str, artifacts: List[Deploymen
                     progress_item.errorMessage = deploy_result.get("message", "Deployment failed.")
                     progress_item.overallStatus = "failed"
                     progress_item.endTime = datetime.now().isoformat()
+                    logger.error(f"❌ [ParallelDeploy] Failed to deploy {artifact.iflowId}")
 
             except Exception as e:
-                logger.error(f"Failed to deploy artifact {artifact.iflowId}: {str(e)}")
+                logger.error(f"❌ [ParallelDeploy] Failed to deploy artifact {artifact.iflowId}: {str(e)}")
                 progress_item.overallStatus = "failed"
                 progress_item.errorMessage = str(e)
                 progress_item.message = f"Deployment failed: {str(e)}"
                 progress_item.endTime = datetime.now().isoformat()
+
+        # Deploy all artifacts in parallel
+        logger.info(f"🚀 [ParallelDeploy] Starting parallel deployment of {len(artifacts)} artifacts")
+        deployment_tasks = [deploy_single_artifact(artifact, i) for i, artifact in enumerate(artifacts)]
+        await asyncio.gather(*deployment_tasks, return_exceptions=True)
+        
+        logger.info(f"✅ [ParallelDeploy] All {len(artifacts)} artifacts processed in parallel")
 
         # Update final deployment status
         completed_count = sum(1 for p in deployment.progress if p.overallStatus == "completed")
@@ -1024,7 +1036,7 @@ async def execute_batch_deployment(deployment_id: str, artifacts: List[Deploymen
         deployment.estimated_completion = datetime.now().isoformat()
 
     except Exception as e:
-        logger.error(f"Batch deployment failed: {str(e)}")
+        logger.error(f"❌ [ParallelDeploy] Batch deployment failed: {str(e)}")
         deployment.status = "failed"
         deployment.estimated_completion = datetime.now().isoformat()
 

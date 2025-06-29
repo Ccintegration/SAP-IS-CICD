@@ -21,6 +21,7 @@ import {
   Package,
   Download,
   Eye,
+  InfoIcon,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -288,10 +289,11 @@ const Stage7Testing: React.FC<Stage8Props> = ({
       ),
     );
 
-    // Run each test case sequentially
-    for (let i = 0; i < defaultTestCases.length; i++) {
-      const testCase = defaultTestCases[i];
-      const progress = ((i + 1) / defaultTestCases.length) * 100;
+    console.log(`🚀 [ParallelTestCases] Starting ${defaultTestCases.length} test cases for ${result.iflowId} in parallel`);
+
+    // Run all test cases in parallel
+    const testCasePromises = defaultTestCases.map(async (testCase, index) => {
+      const progress = ((index + 1) / defaultTestCases.length) * 100;
 
       setTestResults((prev) =>
         prev.map((r) =>
@@ -305,8 +307,35 @@ const Stage7Testing: React.FC<Stage8Props> = ({
         ),
       );
 
-      await runSingleTest(result, testCase);
-    }
+      try {
+        await runSingleTest(result, testCase);
+        console.log(`✅ [ParallelTestCases] Completed ${testCase.name} for ${result.iflowId}`);
+      } catch (error) {
+        console.error(`❌ [ParallelTestCases] Failed ${testCase.name} for ${result.iflowId}:`, error);
+        // Update the test case to failed status
+        setTestResults((prev) =>
+          prev.map((r) =>
+            r.iflowId === result.iflowId
+              ? {
+                  ...r,
+                  testCases: {
+                    ...r.testCases,
+                    [testCase.id]: {
+                      status: "failed" as const,
+                      error: error instanceof Error ? error.message : "Unknown error",
+                    },
+                  },
+                }
+              : r,
+          ),
+        );
+      }
+    });
+
+    // Wait for all test cases to complete in parallel
+    await Promise.all(testCasePromises);
+
+    console.log(`✅ [ParallelTestCases] All test cases completed for ${result.iflowId}`);
 
     // Calculate final results
     setTestResults((prev) =>
@@ -352,10 +381,36 @@ const Stage7Testing: React.FC<Stage8Props> = ({
     setError(null);
 
     try {
-      // Run tests for each iFlow sequentially
-      for (const result of testResults) {
-        await runTestsForIFlow(result);
-      }
+      console.log(`🚀 [ParallelTesting] Starting parallel testing for ${testResults.length} iFlows`);
+
+      // Run tests for all iFlows in parallel
+      const testPromises = testResults.map(async (result) => {
+        try {
+          console.log(`🚀 [ParallelTesting] Starting tests for ${result.iflowId}`);
+          await runTestsForIFlow(result);
+          console.log(`✅ [ParallelTesting] Completed tests for ${result.iflowId}`);
+        } catch (error) {
+          console.error(`❌ [ParallelTesting] Failed to test ${result.iflowId}:`, error);
+          // Update the result to failed status
+          setTestResults((prev) =>
+            prev.map((r) =>
+              r.iflowId === result.iflowId
+                ? {
+                    ...r,
+                    status: "failed" as const,
+                    message: `Testing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    endTime: new Date().toISOString(),
+                  }
+                : r,
+            ),
+          );
+        }
+      });
+
+      // Wait for all test executions to complete in parallel
+      await Promise.all(testPromises);
+      
+      console.log(`✅ [ParallelTesting] All ${testResults.length} iFlows tested in parallel`);
 
       generateTestReport();
       console.log(`Testing completed for ${testResults.length} iFlows`);
@@ -520,6 +575,26 @@ Test Cases:
               Retry
             </Button>
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If there are deployment results but no test suites/test cases configured, show info and allow marking as complete
+  if (data.deploymentResults && testResults.length === 0) {
+    return (
+      <Card className="w-full border-blue-200">
+        <CardContent className="flex flex-col items-center justify-center p-8">
+          <InfoIcon className="w-10 h-10 text-blue-500 mb-2" />
+          <div className="text-lg font-semibold text-blue-800 mb-2">
+            No test suites are configured for the deployed iFlows.
+          </div>
+          <div className="text-gray-600 mb-4">
+            You can mark this stage as complete and proceed to the next step.
+          </div>
+          <Button onClick={() => onComplete({})} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Mark as Complete
+          </Button>
         </CardContent>
       </Card>
     );

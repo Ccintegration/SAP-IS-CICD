@@ -1,13 +1,7 @@
 iFlow_ID|iFlow_Name|iFlow_Version|Parameter_Key|Parameter_Value|Parameter_Type|Saved_At
-Test_IF|SRC_TAR_ENT_INB|1.0.5|JDBC_SRC_ALIAS|demo_jdbc_alias|xsd:string|2025-06-26T16:59:37.962467
-Test_IF|SRC_TAR_ENT_INB|1.0.5|JDBC_CONN_TIMEOUT|3|xsd:string|2025-06-26T16:59:37.962467
-Test_IF|SRC_TAR_ENT_INB|1.0.5|QUERY_RESP_TIMEOUT|3|xsd:string|2025-06-26T16:59:37.962467
-Test_IF|SRC_TAR_ENT_INB|1.0.5|MAX_REC_COUNT|100000|xsd:string|2025-06-26T16:59:37.962467
-Test_IF|SRC_TAR_ENT_INB|1.0.5|BATCH_MODE|true|xsd:string|2025-06-26T16:59:37.962467
-Test_IF|SRC_TAR_ENT_INB|1.0.5|SAP_ProfileId|iflmap|xsd:string|2025-06-26T16:59:37.962467
-PCK_DEV_CCCI-OKR_PIA-INT-CI_GenericErrorHandlngFramework_IFL_Global_Generic_Handler|Global_Error_Handler|Active|Notification||xsd:string|2025-06-26T16:59:37.962467
-PCK_DEV_CCCI-OKR_PIA-INT-CI_GenericErrorHandlngFramework_IFL_Global_Generic_Handler|Global_Error_Handler|Active|SAP_ProfileId|iflmap|xsd:string|2025-06-26T16:59:37.962467
-Rule_Based_Classifier|Rule Based Classifier|Active|PartnerID|EFH_PID123|xsd:string|2025-06-26T16:59:37.962467
-Rule_Based_Classifier|Rule Based Classifier|Active|RulesVariable|RULE_SET|xsd:string|2025-06-26T16:59:37.962467
-Rule_Based_Classifier|Rule Based Classifier|Active|notification_preference|ftp|xsd:string|2025-06-26T16:59:37.962467
-Rule_Based_Classifier|Rule Based Classifier|Active|SAP_ProfileId|iflmap|xsd:string|2025-06-26T16:59:37.962467
+Test_IF|SRC_TAR_ENT_INB|1.0.5|JDBC_SRC_ALIAS|test_jdbc_alias|xsd:string|2025-06-29T17:14:40.648785
+Test_IF|SRC_TAR_ENT_INB|1.0.5|JDBC_CONN_TIMEOUT|3|xsd:string|2025-06-29T17:14:40.648785
+Test_IF|SRC_TAR_ENT_INB|1.0.5|QUERY_RESP_TIMEOUT|3|xsd:string|2025-06-29T17:14:40.648785
+Test_IF|SRC_TAR_ENT_INB|1.0.5|MAX_REC_COUNT|100000|xsd:string|2025-06-29T17:14:40.648785
+Test_IF|SRC_TAR_ENT_INB|1.0.5|BATCH_MODE|true|xsd:string|2025-06-29T17:14:40.648785
+Test_IF|SRC_TAR_ENT_INB|1.0.5|SAP_ProfileId|iflmap|xsd:string|2025-06-29T17:14:40.648785

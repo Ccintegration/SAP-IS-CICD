@@ -653,73 +653,14 @@ const Stage4Validation: React.FC<Stage4Props> = ({
         return;
       }
 
-      console.log(
-        "🚀 [LoadValidation] Starting optimized validation process for iFlows:",
-        data.selectedIFlows,
-      );
+      console.log(`🔄 Loading validation results for ${data.selectedIFlows.length} iFlows in parallel...`);
 
-      // Debug: Log the data structure passed from Stage3
-      console.log("🔍 [LoadValidation] Data passed from Stage3:", {
-        selectedIFlows: data.selectedIFlows,
-        iflowDetails: data.iflowDetails,
-        iflowConfigurations: data.iflowConfigurations,
-        dataKeys: Object.keys(data)
-      });
+      // Create initial results structure
+      const initialResults: IFlowValidation[] = data.selectedIFlows.map(
+        (iflowId: string) => {
+          let iflowName = `iFlow ${iflowId}`;
+          let iflowVersion = "N/A";
 
-      // Initialize results with basic iFlow information
-      const initialResults = data.selectedIFlows.map((iflowId: string) => {
-        // Try to find iFlow details from multiple possible sources
-        let iflowDetails = data.iflowDetails?.find(
-          (iflow: any) => iflow.id === iflowId || iflow.Id === iflowId,
-        );
-
-        // If not found in iflowDetails, try iflowConfigurations
-        if (!iflowDetails) {
-          iflowDetails = data.iflowConfigurations?.find(
-            (iflow: any) => iflow.iflowId === iflowId,
-          );
-        }
-
-        console.log(`🔍 [LoadValidation] Looking for iFlow ${iflowId}:`, {
-          foundInIFlowDetails: !!data.iflowDetails?.find((iflow: any) => iflow.id === iflowId || iflow.Id === iflowId),
-          foundInIFlowConfigurations: !!data.iflowConfigurations?.find((iflow: any) => iflow.iflowId === iflowId),
-          iflowDetails: iflowDetails
-        });
-
-        const iflowVersion =
-          iflowDetails?.version || iflowDetails?.Version || "N/A";
-        const iflowName =
-          iflowDetails?.name || iflowDetails?.Name || iflowDetails?.iflowName || `iFlow ${iflowId}`;
-
-        console.log(`🔍 [LoadValidation] Extracted for ${iflowId}:`, {
-          iflowName,
-          iflowVersion,
-          source: iflowDetails ? 'found' : 'fallback'
-        });
-
-        return {
-          iflowId,
-          iflowName,
-          version: iflowVersion,
-          guidelines: [],
-          totalRules: 0,
-          compliantRules: 0,
-          compliancePercentage: 0,
-          isCompliant: false,
-          hasExecutionHistory: false,
-        };
-      });
-
-      setValidationResults(initialResults);
-
-      // Auto-select first iFlow for detailed view
-      if (initialResults.length > 0 && !selectedIFlow) {
-        setSelectedIFlow(initialResults[0].iflowId);
-      }
-
-      // Execute guidelines for all iFlows
-      for (const iflowId of data.selectedIFlows) {
-        if (!executed[iflowId]) {
           // Try to find iFlow details from multiple possible sources
           let iflowDetails = data.iflowDetails?.find(
             (iflow: any) => iflow.id === iflowId || iflow.Id === iflowId,
@@ -732,96 +673,168 @@ const Stage4Validation: React.FC<Stage4Props> = ({
             );
           }
 
-          const iflowVersion =
-            iflowDetails?.version || iflowDetails?.Version || "N/A";
-
-          try {
-            // Execute design guidelines
-            const executeUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/execute-guidelines?version=${iflowVersion}`;
-            const executeResponse = await fetch(executeUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-            });
-
-            if (!executeResponse.ok) {
-              throw new Error(
-                `Failed to execute design guidelines for ${iflowId}: ${executeResponse.status}`,
-              );
-            }
-
-            const executeResult = await executeResponse.json();
-            const executionId = executeResult.data?.execution_id;
-
-            // Mark as executed
-            setExecuted((prev) => ({ ...prev, [iflowId]: true }));
-
-            // Wait for execution to complete
-            await new Promise((resolve) => setTimeout(resolve, 8000));
-
-            // Get results
-            let fetchUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/design-guidelines?version=${iflowVersion}`;
-            if (executionId) {
-              fetchUrl += `&execution_id=${executionId}`;
-            }
-
-            const fetchResponse = await fetch(fetchUrl);
-
-            if (fetchResponse.ok) {
-              const fetchResult = await fetchResponse.json();
-              const validationData = fetchResult.data;
-
-              // Map API response to component interface
-              const mappedGuidelines = (validationData.guidelines || []).map(
-                mapApiResponseToInterface,
-              );
-
-              // Use backend-calculated metrics
-              const totalRules = validationData.total_rules ?? mappedGuidelines.length;
-              const compliantRules = validationData.compliant_rules ?? mappedGuidelines.filter((g) => g.Status === "PASSED").length;
-              const compliancePercentage = validationData.compliance_percentage ?? 0;
-              const isCompliant = validationData.is_compliant ?? false;
-              const high = validationData.high ?? "NA";
-              const medium = validationData.medium ?? "NA";
-              const low = validationData.low ?? "NA";
-              const complianceStatus = validationData.compliance_status ?? "NA";
-
-              // Update results for this specific iFlow
-              setValidationResults((prev) =>
-                prev.map((result) =>
-                  result.iflowId === iflowId
-                    ? {
-                        ...result,
-                        guidelines: mappedGuidelines,
-                        totalRules,
-                        compliantRules,
-                        compliancePercentage,
-                        isCompliant,
-                        high,
-                        medium,
-                        low,
-                        complianceStatus,
-                        hasExecutionHistory: mappedGuidelines.length > 0,
-                        lastExecuted:
-                          validationData.last_executed ||
-                          new Date().toISOString(),
-                        executionId: validationData.execution_id,
-                      }
-                    : result,
-                ),
-              );
-            }
-          } catch (error) {
-            console.error(
-              `❌ [LoadValidation] Error processing ${iflowId}:`,
-              error,
-            );
-            // Continue with other iFlows even if one fails
+          if (iflowDetails) {
+            iflowName = iflowDetails.name || iflowDetails.iflowName || iflowName;
+            iflowVersion = iflowDetails.version || iflowDetails.Version || iflowVersion;
           }
-        }
+
+          return {
+            iflowId,
+            iflowName,
+            version: iflowVersion,
+            guidelines: [],
+            totalRules: 0,
+            compliantRules: 0,
+            compliancePercentage: 0,
+            isCompliant: false,
+            hasExecutionHistory: false,
+          };
+        },
+      );
+
+      setValidationResults(initialResults);
+
+      // Auto-select first iFlow for detailed view
+      if (initialResults.length > 0 && !selectedIFlow) {
+        setSelectedIFlow(initialResults[0].iflowId);
       }
+
+      // Execute guidelines for all iFlows in parallel
+      const validationPromises = data.selectedIFlows.map(async (iflowId: string) => {
+        if (executed[iflowId]) {
+          return null; // Skip if already executed
+        }
+
+        // Try to find iFlow details from multiple possible sources
+        let iflowDetails = data.iflowDetails?.find(
+          (iflow: any) => iflow.id === iflowId || iflow.Id === iflowId,
+        );
+
+        // If not found in iflowDetails, try iflowConfigurations
+        if (!iflowDetails) {
+          iflowDetails = data.iflowConfigurations?.find(
+            (iflow: any) => iflow.iflowId === iflowId,
+          );
+        }
+
+        const iflowVersion =
+          iflowDetails?.version || iflowDetails?.Version || "N/A";
+
+        try {
+          console.log(`🚀 [ParallelValidation] Starting validation for ${iflowId}`);
+
+          // Step 1: Execute design guidelines
+          const executeUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/execute-guidelines?version=${iflowVersion}`;
+          const executeResponse = await fetch(executeUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+
+          if (!executeResponse.ok) {
+            throw new Error(
+              `Failed to execute design guidelines for ${iflowId}: ${executeResponse.status}`,
+            );
+          }
+
+          const executeResult = await executeResponse.json();
+          const executionId = executeResult.data?.execution_id;
+
+          // Mark as executed
+          setExecuted((prev) => ({ ...prev, [iflowId]: true }));
+
+          // Wait for execution to complete
+          await new Promise((resolve) => setTimeout(resolve, 8000));
+
+          // Step 2: Get results
+          let fetchUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/design-guidelines?version=${iflowVersion}`;
+          if (executionId) {
+            fetchUrl += `&execution_id=${executionId}`;
+          }
+
+          const fetchResponse = await fetch(fetchUrl);
+
+          if (fetchResponse.ok) {
+            const fetchResult = await fetchResponse.json();
+            const validationData = fetchResult.data;
+
+            // Map API response to component interface
+            const mappedGuidelines = (validationData.guidelines || []).map(
+              mapApiResponseToInterface,
+            );
+
+            // Use backend-calculated metrics
+            const totalRules = validationData.total_rules ?? mappedGuidelines.length;
+            const compliantRules = validationData.compliant_rules ?? mappedGuidelines.filter((g) => g.Status === "PASSED").length;
+            const compliancePercentage = validationData.compliance_percentage ?? 0;
+            const isCompliant = validationData.is_compliant ?? false;
+            const high = validationData.high ?? "NA";
+            const medium = validationData.medium ?? "NA";
+            const low = validationData.low ?? "NA";
+            const complianceStatus = validationData.compliance_status ?? "NA";
+
+            console.log(`✅ [ParallelValidation] Completed validation for ${iflowId}`);
+
+            return {
+              iflowId,
+              guidelines: mappedGuidelines,
+              totalRules,
+              compliantRules,
+              compliancePercentage,
+              isCompliant,
+              high,
+              medium,
+              low,
+              complianceStatus,
+              hasExecutionHistory: mappedGuidelines.length > 0,
+              lastExecuted:
+                validationData.last_executed ||
+                new Date().toISOString(),
+              executionId: validationData.execution_id,
+            };
+          } else {
+            throw new Error(`Failed to fetch validation results for ${iflowId}: ${fetchResponse.status}`);
+          }
+        } catch (error) {
+          console.error(`❌ [ParallelValidation] Error processing ${iflowId}:`, error);
+          return {
+            iflowId,
+            guidelines: [],
+            totalRules: 0,
+            compliantRules: 0,
+            compliancePercentage: 0,
+            isCompliant: false,
+            high: "NA",
+            medium: "NA",
+            low: "NA",
+            complianceStatus: "ERROR",
+            hasExecutionHistory: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          };
+        }
+      });
+
+      // Wait for all validation API calls to complete in parallel
+      const validationResults = await Promise.all(validationPromises);
+      
+      console.log(`✅ [ParallelValidation] All ${validationResults.length} validations completed`);
+
+      // Update results for all iFlows at once
+      setValidationResults((prev) =>
+        prev.map((result) => {
+          const validationResult = validationResults.find(v => v?.iflowId === result.iflowId);
+          if (validationResult) {
+            return {
+              ...result,
+              ...validationResult,
+            };
+          }
+          return result;
+        }),
+      );
+
     } catch (error) {
       console.error(
-        "❌ [LoadValidation] Failed to load validation results:",
+        "❌ [ParallelValidation] Failed to load validation results:",
         error,
       );
       setError("Failed to load design validation results");
@@ -843,7 +856,10 @@ const Stage4Validation: React.FC<Stage4Props> = ({
         return;
       }
 
-      for (const iflowId of data.selectedIFlows) {
+      console.log(`🔄 Refreshing validation results for ${data.selectedIFlows.length} iFlows in parallel...`);
+
+      // Refresh validation for all iFlows in parallel
+      const refreshPromises = data.selectedIFlows.map(async (iflowId: string) => {
         try {
           // Try to find iFlow details from multiple possible sources
           let iflowDetails = data.iflowDetails?.find(
@@ -859,6 +875,8 @@ const Stage4Validation: React.FC<Stage4Props> = ({
 
           const iflowVersion =
             iflowDetails?.version || iflowDetails?.Version || "N/A";
+
+          console.log(`🚀 [ParallelRefresh] Starting refresh for ${iflowId}`);
 
           // Step 1: Execute guidelines to get execution_id
           const executeUrl = `http://localhost:8000/api/sap/iflows/${iflowId}/execute-guidelines?version=${iflowVersion}`;
@@ -905,41 +923,72 @@ const Stage4Validation: React.FC<Stage4Props> = ({
             const low = validationData.low ?? "NA";
             const complianceStatus = validationData.compliance_status ?? "NA";
 
-            setValidationResults((prev) =>
-              prev.map((result) =>
-                result.iflowId === iflowId
-                  ? {
-                      ...result,
-                      guidelines: refreshMappedGuidelines,
-                      totalRules,
-                      compliantRules,
-                      compliancePercentage,
-                      isCompliant,
-                      high,
-                      medium,
-                      low,
-                      complianceStatus,
-                      hasExecutionHistory: refreshMappedGuidelines.length > 0,
-                      lastExecuted:
-                        validationData.last_executed ||
-                        new Date().toISOString(),
-                      executionId: validationData.execution_id,
-                    }
-                  : result,
-              ),
-            );
+            console.log(`✅ [ParallelRefresh] Completed refresh for ${iflowId}`);
+
+            return {
+              iflowId,
+              guidelines: refreshMappedGuidelines,
+              totalRules,
+              compliantRules,
+              compliancePercentage,
+              isCompliant,
+              high,
+              medium,
+              low,
+              complianceStatus,
+              hasExecutionHistory: refreshMappedGuidelines.length > 0,
+              lastExecuted:
+                validationData.last_executed ||
+                new Date().toISOString(),
+              executionId: validationData.execution_id,
+            };
+          } else {
+            throw new Error(`Failed to fetch refresh results for ${iflowId}: ${fetchResponse.status}`);
           }
         } catch (error) {
-          console.error(`Failed to refresh validation for ${iflowId}:`, error);
+          console.error(`❌ [ParallelRefresh] Error refreshing ${iflowId}:`, error);
+          return {
+            iflowId,
+            guidelines: [],
+            totalRules: 0,
+            compliantRules: 0,
+            compliancePercentage: 0,
+            isCompliant: false,
+            high: "NA",
+            medium: "NA",
+            low: "NA",
+            complianceStatus: "ERROR",
+            hasExecutionHistory: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          };
         }
-      }
-    } catch (error) {
-      console.error("Failed to refresh validation results:", error);
-      setError(
-        `Failed to refresh validation results: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+      });
+
+      // Wait for all refresh API calls to complete in parallel
+      const refreshResults = await Promise.all(refreshPromises);
+      
+      console.log(`✅ [ParallelRefresh] All ${refreshResults.length} refreshes completed`);
+
+      // Update results for all iFlows at once
+      setValidationResults((prev) =>
+        prev.map((result) => {
+          const refreshResult = refreshResults.find(r => r?.iflowId === result.iflowId);
+          if (refreshResult) {
+            return {
+              ...result,
+              ...refreshResult,
+            };
+          }
+          return result;
+        }),
       );
+
+    } catch (error) {
+      console.error(
+        "❌ [ParallelRefresh] Failed to refresh validation results:",
+        error,
+      );
+      setError("Failed to refresh design validation results");
     } finally {
       setRefreshing(false);
     }
@@ -1435,13 +1484,14 @@ const Stage4Validation: React.FC<Stage4Props> = ({
                       </div>
                       <div className="bg-green-50 p-4 rounded-lg text-center">
                         <div className="text-2xl font-bold text-green-600">
-                          {Math.round(
-                            summaryTableData.reduce(
-                              (sum, row) => sum + row.total,
-                              0,
-                            ) / summaryTableData.length,
-                          )}
-                          %
+                          {summaryTableData.length > 0 
+                            ? Math.round(
+                                summaryTableData.reduce(
+                                  (sum, row) => sum + (typeof row.total === "number" ? row.total : 0),
+                                  0,
+                                ) / summaryTableData.length,
+                              )
+                            : 0}%
                         </div>
                         <div className="text-sm text-green-700">
                           Average Compliance
