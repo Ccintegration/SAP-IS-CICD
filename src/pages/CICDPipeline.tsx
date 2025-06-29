@@ -52,6 +52,8 @@ const CICDPipeline = () => {
     uploadStatus: {},
     deploymentStatus: {},
     testResults: {},
+    transportReleaseMode: false,
+    transportReleaseData: null,
   });
   const [pipelineCompleted, setPipelineCompleted] = useState(false);
 
@@ -139,13 +141,26 @@ const CICDPipeline = () => {
 
   const handleStageComplete = (stageId: number, data: any) => {
     setCompletedStages((prev) => [...prev, stageId]);
+    
+    // Update pipeline data
     if (stageId === 6 && data.deploymentStatus) {
       setPipelineData((prev) => ({ ...prev, ...data, deploymentResults: data.deploymentStatus }));
     } else {
       setPipelineData((prev) => ({ ...prev, ...data }));
     }
+    
+    // Handle navigation to next stage
     if (stageId < stages.length) {
-      setCurrentStage(stageId + 1);
+      let nextStage = stageId + 1;
+      
+      // If in transport release mode and completing Stage 1, skip Stage 2
+      if (stageId === 1 && data.transportReleaseMode) {
+        nextStage = 3; // Skip Stage 2 (iFlow Selection)
+        // Mark Stage 2 as completed since we're skipping it
+        setCompletedStages((prev) => [...prev, 2]);
+      }
+      
+      setCurrentStage(nextStage);
     } else if (stageId === stages.length) {
       setPipelineCompleted(true);
     }

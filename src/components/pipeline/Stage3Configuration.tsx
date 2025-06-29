@@ -172,7 +172,30 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
       console.log('🔍 Stage3 - Loading configurations with data:', data);
       console.log('🔍 Stage3 - data.selectedIFlows:', data.selectedIFlows);
       console.log('🔍 Stage3 - data.iflowDetails:', data.iflowDetails);
+      console.log('🔍 Stage3 - data.transportReleaseMode:', data.transportReleaseMode);
+      console.log('🔍 Stage3 - data.transportReleaseData:', data.transportReleaseData);
 
+      // Handle transport release mode
+      if (data.transportReleaseMode && data.transportReleaseData) {
+        console.log('🚛 Transport Release Mode: Using transport release data');
+        const transportData = data.transportReleaseData;
+        
+        if (!transportData.iflowDetails || transportData.iflowDetails.length === 0) {
+          setError("No iFlow artifacts found in the selected transport release.");
+          setLoading(false);
+          return;
+        }
+        
+        // Use iflowDetails from transport release
+        const iflowObjects = transportData.iflowDetails;
+        console.log('✅ Using iflowDetails from Transport Release:', iflowObjects);
+        
+        // Load configurations for transport release artifacts
+        await loadConfigurationsForIFlows(iflowObjects);
+        return;
+      }
+
+      // Regular mode - handle different data structures from Stage 2
       if ((!data.selectedIFlows || data.selectedIFlows.length === 0) && 
           (!data.iflowDetails || data.iflowDetails.length === 0)) {
         setError("No integration flows selected. Please go back and select iFlows.");
@@ -180,7 +203,6 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
         return;
       }
 
-      // Handle different data structures from Stage 2
       let iflowObjects = [];
       
       if (data.iflowDetails && Array.isArray(data.iflowDetails) && data.iflowDetails.length > 0) {
@@ -208,69 +230,75 @@ const Stage3Configuration: React.FC<Stage3Props> = ({
         return;
       }
 
-      console.log(`🔄 Loading configurations for ${iflowObjects.length} iFlows...`);
-
-      // Load all configuration parameters for all iFlows in parallel
-      const configurationPromises = iflowObjects.map(async (iflow: any) => {
-        try {
-          console.log(`📡 Loading parameters for iFlow: ${iflow.id} (${iflow.name})`);
-          
-          // Use existing backend client method to get real parameters
-          const parameters = await backendClient.getIFlowConfigurations(iflow.id, iflow.version || "active");
-          
-          console.log(`✅ Loaded ${parameters.length} parameters for ${iflow.id}`);
-          
-          // Transform to our parameter format
-          const transformedParameters: ConfigurationParameter[] = parameters.map((param: any) => ({
-            ParameterKey: param.ParameterKey || param.Key || param.key,
-            ParameterValue: param.ParameterValue || param.Value || param.value || "",
-            DataType: param.DataType || param.Type || param.dataType || "xsd:string",
-            Description: param.Description || param.description || "",
-            Mandatory: param.Mandatory || param.mandatory || false,
-          }));
-
-          return {
-            iflowId: iflow.id,
-            iflowName: iflow.name,
-            packageId: iflow.packageId || "UNKNOWN_PKG",
-            packageName: iflow.packageName || `Package ${iflow.packageId || "Unknown"}`,
-            version: iflow.version || "1.0.0",
-            parameters: transformedParameters,
-          };
-        } catch (error) {
-          console.error(`❌ Failed to load parameters for ${iflow.id}:`, error);
-          
-          // Fallback to mock parameters if API fails
-          const mockParams = generateMockParameters(iflow.id, iflow.name);
-          
-          return {
-            iflowId: iflow.id,
-            iflowName: iflow.name,
-            packageId: iflow.packageId || "UNKNOWN_PKG",
-            packageName: iflow.packageName || `Package ${iflow.packageId || "Unknown"}`,
-            version: iflow.version || "1.0.0",
-            parameters: mockParams,
-          };
-        }
-      });
-
-      // Wait for all configuration API calls to complete
-      const configurations = await Promise.all(configurationPromises);
-      
-      console.log(`✅ All configurations loaded:`, configurations);
-      setIFlowConfigurations(configurations);
-      
-      // Auto-select first iFlow
-      if (configurations.length > 0) {
-        setSelectedIFlowId(configurations[0].iflowId);
-      }
-      
-      setLoading(false);
+      // Load configurations for regular mode
+      await loadConfigurationsForIFlows(iflowObjects);
     } catch (err) {
       console.error("❌ Failed to load configurations:", err);
       setError("Failed to load configuration parameters");
       setLoading(false);
     }
+  };
+
+  // Helper function to load configurations for iFlows
+  const loadConfigurationsForIFlows = async (iflowObjects: any[]) => {
+    console.log(`🔄 Loading configurations for ${iflowObjects.length} iFlows...`);
+
+    // Load all configuration parameters for all iFlows in parallel
+    const configurationPromises = iflowObjects.map(async (iflow: any) => {
+      try {
+        console.log(`📡 Loading parameters for iFlow: ${iflow.id} (${iflow.name})`);
+        
+        // Use existing backend client method to get real parameters
+        const parameters = await backendClient.getIFlowConfigurations(iflow.id, iflow.version || "active");
+        
+        console.log(`✅ Loaded ${parameters.length} parameters for ${iflow.id}`);
+        
+        // Transform to our parameter format
+        const transformedParameters: ConfigurationParameter[] = parameters.map((param: any) => ({
+          ParameterKey: param.ParameterKey || param.Key || param.key,
+          ParameterValue: param.ParameterValue || param.Value || param.value || "",
+          DataType: param.DataType || param.Type || param.dataType || "xsd:string",
+          Description: param.Description || param.description || "",
+          Mandatory: param.Mandatory || param.mandatory || false,
+        }));
+
+        return {
+          iflowId: iflow.id,
+          iflowName: iflow.name,
+          packageId: iflow.packageId || "UNKNOWN_PKG",
+          packageName: iflow.packageName || `Package ${iflow.packageId || "Unknown"}`,
+          version: iflow.version || "1.0.0",
+          parameters: transformedParameters,
+        };
+      } catch (error) {
+        console.error(`❌ Failed to load parameters for ${iflow.id}:`, error);
+        
+        // Fallback to mock parameters if API fails
+        const mockParams = generateMockParameters(iflow.id, iflow.name);
+        
+        return {
+          iflowId: iflow.id,
+          iflowName: iflow.name,
+          packageId: iflow.packageId || "UNKNOWN_PKG",
+          packageName: iflow.packageName || `Package ${iflow.packageId || "Unknown"}`,
+          version: iflow.version || "1.0.0",
+          parameters: mockParams,
+        };
+      }
+    });
+
+    // Wait for all configuration API calls to complete
+    const configurations = await Promise.all(configurationPromises);
+    
+    console.log(`✅ All configurations loaded:`, configurations);
+    setIFlowConfigurations(configurations);
+    
+    // Auto-select first iFlow
+    if (configurations.length > 0) {
+      setSelectedIFlowId(configurations[0].iflowId);
+    }
+    
+    setLoading(false);
   };
 
   // Group iFlows by package

@@ -30,8 +30,13 @@ from models import (
     ConnectionTestResult,
     APIResponse,
     TenantConfig,
-    IntegrationPackage
+    IntegrationPackage,
+    TransportRelease,
+    TransportArtifact,
+    TransportReleaseList,
+    TransportArtifactList
 )
+from database import db_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +65,7 @@ sap_client: Optional[SAPClient] = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize SAP client on startup"""
+    """Initialize SAP client and database on startup"""
     global sap_client
     settings = get_settings()
 
@@ -74,6 +79,16 @@ async def startup_event():
 
     sap_client = SAPClient(credentials)
     logger.info("SAP Client initialized successfully")
+    
+    # Initialize database connection
+    await db_manager.connect()
+    logger.info("Database connection initialized successfully")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    await db_manager.close()
+    logger.info("Database connection closed")
 
 @app.get("/")
 async def root():
@@ -1077,6 +1092,92 @@ async def list_deployment_sessions() -> APIResponse:
         message=f"Retrieved {len(sessions)} deployment sessions",
         timestamp=datetime.now().isoformat()
     )
+
+# Transport Release API Endpoints
+
+@app.get("/api/transport-releases", response_model=APIResponse)
+async def get_transport_releases():
+    """Get all transport releases from the database"""
+    try:
+        logger.info("Fetching transport releases from database")
+        transport_releases = await db_manager.get_transport_releases()
+        
+        return APIResponse(
+            success=True,
+            data=TransportReleaseList(
+                transport_releases=transport_releases,
+                total_count=len(transport_releases)
+            ),
+            message=f"Successfully fetched {len(transport_releases)} transport releases"
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch transport releases: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch transport releases: {str(e)}"
+        )
+
+@app.get("/api/transport-releases/{transport_release_id}", response_model=APIResponse)
+async def get_transport_release(transport_release_id: str):
+    """Get a specific transport release by ID"""
+    try:
+        logger.info(f"Fetching transport release: {transport_release_id}")
+        transport_release = await db_manager.get_transport_release_by_id(transport_release_id)
+        
+        if not transport_release:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Transport release with ID {transport_release_id} not found"
+            )
+        
+        return APIResponse(
+            success=True,
+            data=transport_release,
+            message="Successfully fetched transport release"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch transport release {transport_release_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch transport release: {str(e)}"
+        )
+
+@app.get("/api/transport-releases/{transport_release_id}/artifacts", response_model=APIResponse)
+async def get_transport_release_artifacts(transport_release_id: str):
+    """Get all artifacts for a specific transport release"""
+    try:
+        logger.info(f"Fetching artifacts for transport release: {transport_release_id}")
+        
+        # Get transport release details
+        transport_release = await db_manager.get_transport_release_by_id(transport_release_id)
+        if not transport_release:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Transport release with ID {transport_release_id} not found"
+            )
+        
+        # Get artifacts
+        artifacts = await db_manager.get_transport_release_artifacts(transport_release_id)
+        
+        return APIResponse(
+            success=True,
+            data=TransportArtifactList(
+                artifacts=artifacts,
+                total_count=len(artifacts),
+                transport_release=transport_release
+            ),
+            message=f"Successfully fetched {len(artifacts)} artifacts for transport release"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch artifacts for transport release {transport_release_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch transport release artifacts: {str(e)}"
+        )
 
 # Error handlers
 

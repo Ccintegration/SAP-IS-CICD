@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowRight, Package as PackageIcon } from "lucide-react";
+import { Loader2, ArrowRight, Package as PackageIcon, Truck } from "lucide-react";
 
 // Import components and services
 import { Package, Stage1Props } from './types/PackageTypes';
@@ -15,6 +15,7 @@ import { PackagePaginationService, PackagePaginationRequest, PackagePaginationRe
 import PackageTable from './components/PackageTable';
 import PackageSearchAndSort from './components/PackageSearchAndSort';
 import PackagePagination from './components/PackagePagination';
+import { TransportReleaseDialog } from './components/TransportReleaseDialog';
 
 const Stage1PackageList: React.FC<Stage1Props> = ({
   data,
@@ -30,6 +31,11 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
   const [packagesPerPage, setPackagesPerPage] = useState(10);
   const [sortField, setSortField] = useState<SortField>('modifiedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  
+  // Transport Release state
+  const [transportReleaseDialogOpen, setTransportReleaseDialogOpen] = useState(false);
+  const [transportReleaseMode, setTransportReleaseMode] = useState(data.transportReleaseMode || false);
+  const [transportReleaseData, setTransportReleaseData] = useState(data.transportReleaseData || null);
   
   // Pagination state
   const [paginationData, setPaginationData] = useState<PackagePaginationResponse | null>(null);
@@ -204,147 +210,244 @@ const Stage1PackageList: React.FC<Stage1Props> = ({
     paginationData.packages.length > 0 && 
     paginationData.packages.every(pkg => selectedPackages.includes(pkg.id)) : false;
 
+  const handleTransportReleaseSelect = (transportReleaseData: any) => {
+    setTransportReleaseMode(true);
+    setTransportReleaseData(transportReleaseData);
+    setSelectedPackages(transportReleaseData.selectedPackages || []);
+    
+    // Complete the stage with transport release data
+    onComplete({
+      ...data,
+      ...transportReleaseData,
+      transportReleaseMode: true,
+      transportReleaseData: transportReleaseData
+    });
+    
+    // Navigate directly to Stage 3 (Configuration)
+    onNext();
+  };
+
+  const handleManualMode = () => {
+    setTransportReleaseMode(false);
+    setTransportReleaseData(null);
+    setSelectedPackages([]);
+  };
+
   return (
     <Card className="w-full">
       <CardContent className="space-y-6">
-        {/* Search and Sort Controls */}
-        <div className="mt-4">
-          <PackageSearchAndSort
-            searchTerm={searchTerm}
-            onSearchChange={handleSearchChange}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSortFieldChange={handleSortFieldChange}
-            onSortDirectionChange={handleSortDirectionChange}
-            packagesPerPage={packagesPerPage}
-            onPackagesPerPageChange={handlePackagesPerPageChange}
-            onRefresh={handleRefresh}
-            isLoading={loading}
-          />
-        </div>
-
-        {/* Loading indicator for search/sort */}
-        {loading && paginationData && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <div className="flex items-center space-x-2">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              <span className="text-sm text-blue-800">
-                {searchTerm ? `Searching for "${searchTerm}"...` : "Updating package list..."}
-              </span>
+        {/* Transport Release Section */}
+        {!transportReleaseMode && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-blue-900">Transport Release Option</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Select artifacts from a Transport Release to skip manual package and iFlow selection.
+                </p>
+              </div>
+              <Button
+                onClick={() => setTransportReleaseDialogOpen(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <Truck className="w-4 h-4" />
+                Select artifacts from TR
+              </Button>
             </div>
           </div>
         )}
 
-        {/* No Results Message */}
-        {!loading && paginationData && paginationData.packages.length === 0 && searchTerm && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 text-center">
-            <h3 className="text-yellow-800 font-medium">No packages found</h3>
-            <p className="text-yellow-600 text-sm mt-1">
-              No packages match your search term "<strong>{searchTerm}</strong>". 
-              Try adjusting your search criteria or clear the search to see all packages.
-            </p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setSearchTerm("")}
-              className="mt-2"
+        {/* Transport Release Mode Display */}
+        {transportReleaseMode && transportReleaseData && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-green-900 flex items-center gap-2">
+                  <Truck className="w-4 h-4" />
+                  Transport Release Mode Active
+                </h3>
+                <p className="text-sm text-green-700 mt-1">
+                  Packages included in the Transport Release: {transportReleaseData.selectedPackages?.join(', ') || 'None'}
+                </p>
+                <p className="text-sm text-green-600 mt-1">
+                  {transportReleaseData.selectedIFlows?.length || 0} iFlow artifacts selected
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleManualMode}
+                className="text-green-700 border-green-300 hover:bg-green-100"
+              >
+                Switch to Manual Mode
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Package Selection (only show if not in transport release mode) */}
+        {!transportReleaseMode && (
+          <>
+            {/* Search and Sort Controls */}
+            <div className="mt-4">
+              <PackageSearchAndSort
+                searchTerm={searchTerm}
+                onSearchChange={handleSearchChange}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSortFieldChange={handleSortFieldChange}
+                onSortDirectionChange={handleSortDirectionChange}
+                packagesPerPage={packagesPerPage}
+                onPackagesPerPageChange={handlePackagesPerPageChange}
+                onRefresh={handleRefresh}
+                isLoading={loading}
+              />
+            </div>
+
+            {/* Loading indicator for search/sort */}
+            {loading && paginationData && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span className="text-sm text-blue-800">
+                    {searchTerm ? `Searching for "${searchTerm}"...` : "Updating package list..."}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* No Results Message */}
+            {paginationData && paginationData.packages.length === 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 text-center">
+                <h3 className="text-yellow-800 font-medium">No packages found</h3>
+                <p className="text-yellow-600 text-sm mt-1">
+                  No packages match your search term "<strong>{searchTerm}</strong>". 
+                  Try adjusting your search criteria or clear the search to see all packages.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setSearchTerm("")}
+                  className="mt-2"
+                >
+                  Clear Search
+                </Button>
+              </div>
+            )}
+
+            {/* Package Table */}
+            {paginationData && paginationData.packages.length > 0 && (
+              <PackageTable
+                packages={paginationData.packages}
+                selectedPackages={selectedPackages}
+                onPackageToggle={handlePackageToggle}
+                onSelectAll={handleSelectAll}
+                isSelectAllChecked={isSelectAllChecked}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+              />
+            )}
+
+            {/* Pagination Info and Controls */}
+            {paginationData && (
+              <>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <div>
+                    showing packages {((paginationData.currentPage - 1) * paginationData.pageSize) + 1} to{' '}
+                    {Math.min(paginationData.currentPage * paginationData.pageSize, paginationData.totalCount)} from{' '}
+                    {paginationData.totalCount} packages
+                    {searchTerm && (
+                      <span className="text-blue-600 ml-2">
+                        (filtered by "{searchTerm}")
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Show</span>
+                      <Select
+                        value={packagesPerPage.toString()}
+                        onValueChange={handlePackagesPerPageChange}
+                      >
+                        <SelectTrigger className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm">per page</span>
+                    </div>
+                    {selectedPackages.length > 0 && (
+                      <div className="text-blue-600">
+                        {selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <PackagePagination
+                  currentPage={paginationData.currentPage}
+                  totalPages={paginationData.totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </>
+            )}
+
+            {/* Selection Summary */}
+            {selectedPackages.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>{selectedPackages.length}</strong> package{selectedPackages.length === 1 ? "" : "s"} selected for CI/CD pipeline
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-between pt-4">
+              <div className="text-sm text-gray-500">
+                {paginationData && (
+                  <span>
+                    Page {paginationData.currentPage} of {paginationData.totalPages} 
+                    • {paginationData.totalCount} total packages
+                  </span>
+                )}
+              </div>
+              <Button
+                onClick={handleNext}
+                disabled={selectedPackages.length === 0}
+                className="flex items-center space-x-2"
+              >
+                <span>Next: Select iFlows ({selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected)</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Transport Release Mode Action Button */}
+        {transportReleaseMode && (
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={() => onNext()}
+              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
             >
-              Clear Search
+              <span>Continue to Configuration ({transportReleaseData?.selectedIFlows?.length || 0} artifacts)</span>
+              <ArrowRight className="w-4 h-4" />
             </Button>
           </div>
         )}
 
-        {/* Package Table */}
-        {paginationData && paginationData.packages.length > 0 && (
-          <PackageTable
-            packages={paginationData.packages}
-            selectedPackages={selectedPackages}
-            onPackageToggle={handlePackageToggle}
-            onSelectAll={handleSelectAll}
-            isSelectAllChecked={isSelectAllChecked}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-          />
-        )}
-
-        {/* Pagination Info and Controls */}
-        {paginationData && paginationData.packages.length > 0 && (
-          <>
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <div>
-                showing packages {((paginationData.currentPage - 1) * paginationData.pageSize) + 1} to{' '}
-                {Math.min(paginationData.currentPage * paginationData.pageSize, paginationData.totalCount)} from{' '}
-                {paginationData.totalCount} packages
-                {searchTerm && (
-                  <span className="text-blue-600 ml-2">
-                    (filtered by "{searchTerm}")
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Show</span>
-                  <Select
-                    value={packagesPerPage.toString()}
-                    onValueChange={handlePackagesPerPageChange}
-                  >
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm">per page</span>
-                </div>
-                {selectedPackages.length > 0 && (
-                  <div className="text-blue-600">
-                    {selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <PackagePagination
-              currentPage={paginationData.currentPage}
-              totalPages={paginationData.totalPages}
-              onPageChange={handlePageChange}
-            />
-          </>
-        )}
-
-        {/* Selection Summary */}
-        {selectedPackages.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <p className="text-sm text-blue-800">
-              <strong>{selectedPackages.length}</strong> package{selectedPackages.length === 1 ? "" : "s"} selected for CI/CD pipeline
-            </p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex justify-between pt-4">
-          <div className="text-sm text-gray-500">
-            {paginationData && (
-              <span>
-                Page {paginationData.currentPage} of {paginationData.totalPages} 
-                • {paginationData.totalCount} total packages
-              </span>
-            )}
-          </div>
-          <Button
-            onClick={handleNext}
-            disabled={selectedPackages.length === 0}
-            className="flex items-center space-x-2"
-          >
-            <span>Next: Select iFlows ({selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected)</span>
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </div>
+        {/* Transport Release Dialog */}
+        <TransportReleaseDialog
+          open={transportReleaseDialogOpen}
+          onOpenChange={setTransportReleaseDialogOpen}
+          onTransportReleaseSelect={handleTransportReleaseSelect}
+        />
       </CardContent>
     </Card>
   );

@@ -406,3 +406,39 @@ class AccessToken(BaseModel):
     last_used: Optional[datetime] = Field(None, description="Last used timestamp")
     is_active: bool = Field(True, description="Whether token is active")
     created_at: datetime = Field(..., description="Token creation timestamp")
+
+# Transport Release Models
+class TransportRelease(BaseModel):
+    id: str = Field(..., description="Transport Release ID")
+    name: str = Field(..., description="Transport Release name")
+    description: Optional[str] = Field(None, description="Transport Release description")
+    status: str = Field("active", description="Transport Release status")
+    created_date: datetime = Field(..., description="Creation date")
+    created_by: str = Field(..., description="Created by user")
+    modified_date: Optional[datetime] = Field(None, description="Last modified date")
+    modified_by: Optional[str] = Field(None, description="Modified by user")
+    target_environment: str = Field(..., description="Target environment for deployment")
+    source_environment: str = Field(..., description="Source environment")
+    total_artifacts: int = Field(0, description="Total number of artifacts in this transport release")
+
+class TransportArtifact(BaseModel):
+    id: int
+    transport_release_id: str
+    iflow_id: str
+    iflow_name: str
+    package_id: str
+    package_name: str
+    version: str = Field("1.0.0", description="iFlow version")
+    status: str = Field("pending", description="Artifact status")
+    created_date: datetime = Field(..., description="Creation date")
+    modified_date: Optional[datetime] = Field(None, description="Last modified date")
+    deployment_order: Optional[int] = Field(None, description="Deployment order")
+
+class TransportReleaseList(BaseModel):
+    transport_releases: List[TransportRelease] = Field(default_factory=list, description="List of transport releases")
+    total_count: int = Field(0, description="Total number of transport releases")
+
+class TransportArtifactList(BaseModel):
+    artifacts: List[TransportArtifact] = Field(default_factory=list, description="List of transport artifacts")
+    total_count: int = Field(0, description="Total number of artifacts")
+    transport_release: Optional[TransportRelease] = Field(None, description="Transport release details")
